@@ -5,14 +5,39 @@
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+<<<<<<< HEAD
     "axios": "^1.6.0"
+=======
+    "axios": "^1.6.0",
+    "react-scripts": "5.0.1"
+>>>>>>> 964ba4b645af78847cf985480f1334874a58bfe4
   },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build"
   },
   "devDependencies": {
+<<<<<<< HEAD
     "react-scripts": "5.0.1",
     "typescript": "^5.0.0"
   }
 }
+=======
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "typescript": "^4.9.5"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}
+>>>>>>> 964ba4b645af78847cf985480f1334874a58bfe4

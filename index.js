@@ -1,10 +1,11 @@
+// ========== 引入环境变量 ==========
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-require('dotenv').config();
 const db = require('./db');  // 添加这行：引入数据库
-
+const { generatePoints } = require('./aiService');//引入 AI 服务
+// ========== 创建 Express 应用 ==========
 const app = express();
-
 app.use(cors());
 app.use(express.json());
 
@@ -65,11 +66,63 @@ app.post('/api/resume', async (req, res) => {
     });
   }
 });
-// =====================================
 
-// 启动服务器
+
+
+
+
+// ========== AI 生成简历要点接口 ==========
+app.post('/api/ai/generate-points', async (req, res) => {
+  try {
+    const { workDescription } = req.body;
+    
+    if (!workDescription || workDescription.trim() === '') {
+      return res.status(400).json({
+        code: 400,
+        message: '工作描述不能为空'
+      });
+    }
+    
+    console.log('收到生成请求:', workDescription);
+    
+    const points = await generatePoints(workDescription);
+    
+    res.json({
+      code: 200,
+      data: { points },
+      message: '生成成功'
+    });
+    
+  } catch (error) {
+    console.error('生成失败:', error);
+    res.status(500).json({
+      code: 500,
+      message: 'AI生成失败，请重试',
+      error: error.message
+    });
+  }
+});
+
+// ========== 启动服务器 ==========
 const PORT = 5000;
-app.listen(PORT, () => {
-  console.log(`✅ 服务器已启动！`);
-  console.log(`✅ 访问地址：http://localhost:${PORT}`);
+try {
+  app.listen(PORT, () => {
+    console.log(`✅ 服务器已启动！`);
+    console.log(`✅ 访问地址：http://localhost:${PORT}`);
+  });
+} catch (error) {
+  console.error('服务器启动失败:', error);
+  process.exit(1);
+}
+
+// 捕获未处理的异常
+process.on('uncaughtException', (error) => {
+  console.error('未捕获的异常:', error);
+  process.exit(1);
+});
+
+// 捕获未处理的Promise拒绝
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('未处理的Promise拒绝:', reason);
+  process.exit(1);
 });

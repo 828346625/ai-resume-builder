@@ -18,7 +18,6 @@ interface Education {
   endDate: string;
 }
 
-// ========== 侧边栏菜单项 ==========
 type MenuItem = 'generate' | 'resumes' | 'profile';
 
 // ========== 主组件 ==========
@@ -41,10 +40,7 @@ function App() {
     { id: Date.now(), school: '', degree: '', startDate: '', endDate: '' }
   ]);
 
-  // 保存的简历列表
   const [savedResumes, setSavedResumes] = useState<any[]>([]);
-
-  // AI 生成
   const [aiInput, setAiInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -110,14 +106,12 @@ function App() {
       educations: educations.filter(edu => edu.school || edu.degree),
       summary
     };
-    // 保存到本地列表
     const newResume = { ...resumeData, id: Date.now(), createdAt: new Date().toLocaleString() };
     setSavedResumes([newResume, ...savedResumes]);
     setMessage('✅ 简历已保存到本地！');
     setTimeout(() => setMessage(''), 2000);
   };
 
-  // ========== 加载简历到表单 ==========
   const loadResume = (resume: any) => {
     setName(resume.name || '');
     setJobTitle(resume.jobTitle || '');
@@ -135,7 +129,6 @@ function App() {
     setMessage('已加载简历，可以继续编辑');
   };
 
-  // ========== 新建简历 ==========
   const newResume = () => {
     setName('');
     setJobTitle('');
@@ -151,183 +144,225 @@ function App() {
   };
 
   return (
-    <div style={{ display: 'flex', height: '100vh', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      
-      {/* ========== 左侧边栏 ========== */}
-      <aside style={{
-        width: '260px',
-        background: 'linear-gradient(180deg, #1a1a2e 0%, #16213e 100%)',
-        color: '#fff',
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '24px 16px',
-        boxShadow: '2px 0 10px rgba(0,0,0,0.1)'
-      }}>
-        {/* Logo */}
-        <div style={{ marginBottom: '40px', paddingLeft: '12px' }}>
-          <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 'bold' }}>📄 AI简历通</h2>
-          <p style={{ margin: '4px 0 0', fontSize: '12px', opacity: 0.7 }}>智能简历生成器</p>
-        </div>
+    // 最外层：相对定位容器 + 水晶背景
+    <div style={{ minHeight: '100vh', width: '100%', position: 'relative' }}>
+      {/* 水晶背景层 */}
+      <style>{`
+        @keyframes crystal-shimmer {
+          0%, 100% { 
+            background-position: 0% 0%, 0% 0%, 0% 0%, 50% 50%;
+            background-size: 10px 10px, 10px 10px, 200% 200%, 200% 200%;
+          }
+          50% { 
+            background-position: 1px 1px, -1px -1px, 100% 100%, 50% 50%;
+            background-size: 12px 12px, 12px 12px, 200% 200%, 180% 180%;
+          }
+        }
+      `}</style>
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 0,
+          background: `
+            repeating-linear-gradient(
+              60deg,
+              transparent 0px,
+              transparent 1px,
+              rgba(255, 255, 255, 0.05) 1px,
+              rgba(255, 255, 255, 0.05) 2px
+            ),
+            repeating-linear-gradient(
+              -60deg,
+              transparent 0px,
+              transparent 1px,
+              rgba(255, 255, 255, 0.05) 1px,
+              rgba(255, 255, 255, 0.05) 2px
+            ),
+            linear-gradient(
+              60deg,
+              rgba(43, 108, 176, 0.4) 0%,
+              rgba(72, 126, 176, 0.4) 33%,
+              rgba(95, 142, 176, 0.4) 66%,
+              rgba(116, 157, 176, 0.4) 100%
+            ),
+            radial-gradient(
+              circle at 50% 50%,
+              rgba(255, 255, 255, 0.2) 0%,
+              transparent 50%
+            )
+          `,
+          backgroundBlendMode: "overlay, overlay, normal, screen",
+          animation: "crystal-shimmer 15s ease-in-out infinite",
+        }}
+      />
 
-        {/* 用户信息（未登录） */}
-        {!isLoggedIn ? (
-          <div style={{ marginBottom: '30px', padding: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '12px', textAlign: 'center' }}>
-            <p style={{ margin: '0 0 10px', fontSize: '14px' }}>👤 未登录</p>
-            <button onClick={() => setShowLoginModal(true)} style={sidebarButtonStyle}>登录 / 注册</button>
+      {/* 主要内容 - 侧边栏 + 右侧内容 */}
+      <div style={{ display: 'flex', height: '100vh', position: 'relative', zIndex: 1 }}>
+        {/* ========== 左侧边栏 ========== */}
+        <aside style={{
+          width: '260px',
+          background: 'linear-gradient(180deg, #1a1a2e 0%, #16213e 100%)',
+          color: '#fff',
+          display: 'flex',
+          flexDirection: 'column',
+          padding: '24px 16px',
+          boxShadow: '2px 0 10px rgba(0,0,0,0.1)'
+        }}>
+          <div style={{ marginBottom: '40px', paddingLeft: '12px' }}>
+            <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 'bold' }}>📄 AI简历通</h2>
+            <p style={{ margin: '4px 0 0', fontSize: '12px', opacity: 0.7 }}>智能简历生成器</p>
           </div>
-        ) : (
-          <div style={{ marginBottom: '30px', padding: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '12px' }}>
-            <p style={{ margin: '0', fontSize: '14px', fontWeight: 'bold' }}>欢迎回来</p>
-            <p style={{ margin: '4px 0 0', fontSize: '12px', opacity: 0.7 }}>user@example.com</p>
-          </div>
-        )}
 
-        {/* 导航菜单 */}
-        <nav style={{ flex: 1 }}>
-          <div onClick={() => setActiveMenu('generate')} style={{ ...menuItemStyle, background: activeMenu === 'generate' ? 'rgba(255,255,255,0.15)' : 'transparent' }}>
-            <span style={{ marginRight: '12px' }}>✨</span> 生成简历
-          </div>
-          <div onClick={() => setActiveMenu('resumes')} style={{ ...menuItemStyle, background: activeMenu === 'resumes' ? 'rgba(255,255,255,0.15)' : 'transparent' }}>
-            <span style={{ marginRight: '12px' }}>📋</span> 我的简历
-          </div>
-          <div onClick={() => setActiveMenu('profile')} style={{ ...menuItemStyle, background: activeMenu === 'profile' ? 'rgba(255,255,255,0.15)' : 'transparent' }}>
-            <span style={{ marginRight: '12px' }}>👤</span> 个人资料
-          </div>
-        </nav>
-
-        {/* 新建按钮 */}
-        <button onClick={newResume} style={{ ...sidebarButtonStyle, marginTop: '20px', background: '#007bff' }}>
-          + 新建简历
-        </button>
-      </aside>
-
-      {/* ========== 右侧主内容区 ========== */}
-      <main style={{ flex: 1, overflow: 'auto', background: '#f5f7fa', padding: '24px 32px' }}>
-        
-        {/* 生成简历页面 */}
-        {activeMenu === 'generate' && (
-          <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-            <h1 style={{ fontSize: '28px', marginBottom: '8px', color: '#1a1a2e' }}>📝 生成简历</h1>
-            <p style={{ color: '#666', marginBottom: '24px' }}>填写以下信息，AI 将帮你生成专业简历</p>
-
-            {/* 基本信息 */}
-            <Section title="基本信息">
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <input type="text" placeholder="姓名 *" value={name} onChange={e => setName(e.target.value)} style={inputStyle} />
-                <input type="text" placeholder="职位" value={jobTitle} onChange={e => setJobTitle(e.target.value)} style={inputStyle} />
-                <input type="email" placeholder="邮箱" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} />
-                <input type="tel" placeholder="电话" value={phone} onChange={e => setPhone(e.target.value)} style={inputStyle} />
-              </div>
-              <input type="text" placeholder="技能（用逗号分隔，如：React, TypeScript, Node.js）" value={skills} onChange={e => setSkills(e.target.value)} style={inputStyle} />
-            </Section>
-
-            {/* AI 生成区 */}
-            <Section title="🤖 AI 智能生成" highlight>
-              <textarea placeholder="描述你的工作经历，AI 将生成3条专业简历要点..." value={aiInput} onChange={e => setAiInput(e.target.value)} rows={4} style={{ ...inputStyle, width: '100%' }} />
-              <button onClick={handleAIGenerate} disabled={aiLoading} style={{ ...buttonStyle, marginTop: '12px' }}>
-                {aiLoading ? '生成中...' : '✨ 生成简历要点'}
-              </button>
-            </Section>
-
-            {/* 工作经历 */}
-            <Section title="💼 工作经历">
-              {workExperiences.map((exp, idx) => (
-                <div key={exp.id} style={cardStyle}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                    <strong>经历 {idx + 1}</strong>
-                    {workExperiences.length > 1 && <button onClick={() => removeWorkExperience(exp.id)} style={smallButtonStyle}>删除</button>}
-                  </div>
-                  <input type="text" placeholder="公司名称" value={exp.company} onChange={e => updateWorkExperience(exp.id, 'company', e.target.value)} style={inputStyle} />
-                  <input type="text" placeholder="职位" value={exp.position} onChange={e => updateWorkExperience(exp.id, 'position', e.target.value)} style={inputStyle} />
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    <input type="text" placeholder="开始时间" value={exp.startDate} onChange={e => updateWorkExperience(exp.id, 'startDate', e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-                    <input type="text" placeholder="结束时间" value={exp.endDate} onChange={e => updateWorkExperience(exp.id, 'endDate', e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-                  </div>
-                  <textarea placeholder="工作描述" value={exp.description} onChange={e => updateWorkExperience(exp.id, 'description', e.target.value)} rows={3} style={inputStyle} />
-                </div>
-              ))}
-              <button onClick={addWorkExperience} style={outlineButtonStyle}>+ 添加工作经历</button>
-            </Section>
-
-            {/* 教育经历 */}
-            <Section title="🎓 教育经历">
-              {educations.map((edu, idx) => (
-                <div key={edu.id} style={cardStyle}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                    <strong>教育 {idx + 1}</strong>
-                    {educations.length > 1 && <button onClick={() => removeEducation(edu.id)} style={smallButtonStyle}>删除</button>}
-                  </div>
-                  <input type="text" placeholder="学校名称" value={edu.school} onChange={e => updateEducation(edu.id, 'school', e.target.value)} style={inputStyle} />
-                  <input type="text" placeholder="学位" value={edu.degree} onChange={e => updateEducation(edu.id, 'degree', e.target.value)} style={inputStyle} />
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    <input type="text" placeholder="开始时间" value={edu.startDate} onChange={e => updateEducation(edu.id, 'startDate', e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-                    <input type="text" placeholder="结束时间" value={edu.endDate} onChange={e => updateEducation(edu.id, 'endDate', e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-                  </div>
-                </div>
-              ))}
-              <button onClick={addEducation} style={outlineButtonStyle}>+ 添加教育经历</button>
-            </Section>
-
-            {/* 个人简介 */}
-            <Section title="📝 个人简介">
-              <textarea placeholder="简要介绍自己..." value={summary} onChange={e => setSummary(e.target.value)} rows={4} style={{ ...inputStyle, width: '100%' }} />
-            </Section>
-
-            {/* 保存按钮 */}
-            <div style={{ textAlign: 'center', marginTop: '24px', marginBottom: '40px' }}>
-              <button onClick={handleSave} style={{ ...buttonStyle, backgroundColor: '#28a745', padding: '12px 32px', fontSize: '16px' }}>
-                💾 保存简历
-              </button>
+          {!isLoggedIn ? (
+            <div style={{ marginBottom: '30px', padding: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '12px', textAlign: 'center' }}>
+              <p style={{ margin: '0 0 10px', fontSize: '14px' }}>👤 未登录</p>
+              <button onClick={() => setShowLoginModal(true)} style={sidebarButtonStyle}>登录 / 注册</button>
             </div>
+          ) : (
+            <div style={{ marginBottom: '30px', padding: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '12px' }}>
+              <p style={{ margin: '0', fontSize: '14px', fontWeight: 'bold' }}>欢迎回来</p>
+              <p style={{ margin: '4px 0 0', fontSize: '12px', opacity: 0.7 }}>user@example.com</p>
+            </div>
+          )}
 
-            {message && <MessageBanner message={message} />}
-          </div>
-        )}
+          <nav style={{ flex: 1 }}>
+            <div onClick={() => setActiveMenu('generate')} style={{ ...menuItemStyle, background: activeMenu === 'generate' ? 'rgba(255,255,255,0.15)' : 'transparent' }}>
+              <span style={{ marginRight: '12px' }}>✨</span> 生成简历
+            </div>
+            <div onClick={() => setActiveMenu('resumes')} style={{ ...menuItemStyle, background: activeMenu === 'resumes' ? 'rgba(255,255,255,0.15)' : 'transparent' }}>
+              <span style={{ marginRight: '12px' }}>📋</span> 我的简历
+            </div>
+            <div onClick={() => setActiveMenu('profile')} style={{ ...menuItemStyle, background: activeMenu === 'profile' ? 'rgba(255,255,255,0.15)' : 'transparent' }}>
+              <span style={{ marginRight: '12px' }}>👤</span> 个人资料
+            </div>
+          </nav>
 
-        {/* 我的简历页面 */}
-        {activeMenu === 'resumes' && (
-          <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-            <h1 style={{ fontSize: '28px', marginBottom: '8px', color: '#1a1a2e' }}>📋 我的简历</h1>
-            <p style={{ color: '#666', marginBottom: '24px' }}>共 {savedResumes.length} 份简历</p>
-            {savedResumes.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '60px', background: '#fff', borderRadius: '16px' }}>
-                <p style={{ fontSize: '18px', color: '#999' }}>暂无简历，快去生成一份吧</p>
-                <button onClick={() => setActiveMenu('generate')} style={buttonStyle}>开始创建</button>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {savedResumes.map((resume) => (
-                  <div key={resume.id} style={{ background: '#fff', borderRadius: '12px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <h3 style={{ margin: '0 0 4px' }}>{resume.name || '未命名'}</h3>
-                        <p style={{ margin: '0', color: '#666', fontSize: '14px' }}>{resume.jobTitle || '暂无职位'} | 创建于 {resume.createdAt}</p>
-                      </div>
-                      <button onClick={() => loadResume(resume)} style={{ ...buttonStyle, padding: '6px 16px', fontSize: '14px' }}>编辑</button>
+          <button onClick={newResume} style={{ ...sidebarButtonStyle, marginTop: '20px', background: '#007bff' }}>
+            + 新建简历
+          </button>
+        </aside>
+
+        {/* ========== 右侧主内容区 ========== */}
+        <main style={{ flex: 1, overflow: 'auto', background: 'rgba(245, 247, 250, 0.85)', padding: '24px 32px' }}>
+          
+          {activeMenu === 'generate' && (
+            <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+              <h1 style={{ fontSize: '28px', marginBottom: '8px', color: '#1a1a2e' }}>📝 生成简历</h1>
+              <p style={{ color: '#666', marginBottom: '24px' }}>填写以下信息，AI 将帮你生成专业简历</p>
+
+              <Section title="基本信息">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <input type="text" placeholder="姓名 *" value={name} onChange={e => setName(e.target.value)} style={inputStyle} />
+                  <input type="text" placeholder="职位" value={jobTitle} onChange={e => setJobTitle(e.target.value)} style={inputStyle} />
+                  <input type="email" placeholder="邮箱" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} />
+                  <input type="tel" placeholder="电话" value={phone} onChange={e => setPhone(e.target.value)} style={inputStyle} />
+                </div>
+                <input type="text" placeholder="技能（用逗号分隔，如：React, TypeScript, Node.js）" value={skills} onChange={e => setSkills(e.target.value)} style={inputStyle} />
+              </Section>
+
+              <Section title="🤖 AI 智能生成" highlight>
+                <textarea placeholder="描述你的工作经历，AI 将生成3条专业简历要点..." value={aiInput} onChange={e => setAiInput(e.target.value)} rows={4} style={{ ...inputStyle, width: '100%' }} />
+                <button onClick={handleAIGenerate} disabled={aiLoading} style={{ ...buttonStyle, marginTop: '12px' }}>
+                  {aiLoading ? '生成中...' : '✨ 生成简历要点'}
+                </button>
+              </Section>
+
+              <Section title="💼 工作经历">
+                {workExperiences.map((exp, idx) => (
+                  <div key={exp.id} style={cardStyle}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                      <strong>经历 {idx + 1}</strong>
+                      {workExperiences.length > 1 && <button onClick={() => removeWorkExperience(exp.id)} style={smallButtonStyle}>删除</button>}
+                    </div>
+                    <input type="text" placeholder="公司名称" value={exp.company} onChange={e => updateWorkExperience(exp.id, 'company', e.target.value)} style={inputStyle} />
+                    <input type="text" placeholder="职位" value={exp.position} onChange={e => updateWorkExperience(exp.id, 'position', e.target.value)} style={inputStyle} />
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <input type="text" placeholder="开始时间" value={exp.startDate} onChange={e => updateWorkExperience(exp.id, 'startDate', e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+                      <input type="text" placeholder="结束时间" value={exp.endDate} onChange={e => updateWorkExperience(exp.id, 'endDate', e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+                    </div>
+                    <textarea placeholder="工作描述" value={exp.description} onChange={e => updateWorkExperience(exp.id, 'description', e.target.value)} rows={3} style={inputStyle} />
+                  </div>
+                ))}
+                <button onClick={addWorkExperience} style={outlineButtonStyle}>+ 添加工作经历</button>
+              </Section>
+
+              <Section title="🎓 教育经历">
+                {educations.map((edu, idx) => (
+                  <div key={edu.id} style={cardStyle}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                      <strong>教育 {idx + 1}</strong>
+                      {educations.length > 1 && <button onClick={() => removeEducation(edu.id)} style={smallButtonStyle}>删除</button>}
+                    </div>
+                    <input type="text" placeholder="学校名称" value={edu.school} onChange={e => updateEducation(edu.id, 'school', e.target.value)} style={inputStyle} />
+                    <input type="text" placeholder="学位" value={edu.degree} onChange={e => updateEducation(edu.id, 'degree', e.target.value)} style={inputStyle} />
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <input type="text" placeholder="开始时间" value={edu.startDate} onChange={e => updateEducation(edu.id, 'startDate', e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+                      <input type="text" placeholder="结束时间" value={edu.endDate} onChange={e => updateEducation(edu.id, 'endDate', e.target.value)} style={{ ...inputStyle, flex: 1 }} />
                     </div>
                   </div>
                 ))}
-              </div>
-            )}
-          </div>
-        )}
+                <button onClick={addEducation} style={outlineButtonStyle}>+ 添加教育经历</button>
+              </Section>
 
-        {/* 个人资料页面 */}
-        {activeMenu === 'profile' && (
-          <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-            <h1 style={{ fontSize: '28px', marginBottom: '24px', color: '#1a1a2e' }}>👤 个人资料</h1>
-            <div style={{ background: '#fff', borderRadius: '16px', padding: '32px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-              <p style={{ textAlign: 'center', color: '#666', padding: '40px 0' }}>
-                登录功能正在开发中...<br />
-                目前简历数据保存在本地浏览器中
-              </p>
-              {isLoggedIn && (
-                <button onClick={() => setIsLoggedIn(false)} style={{ ...buttonStyle, backgroundColor: '#dc3545', width: '100%' }}>退出登录</button>
+              <Section title="📝 个人简介">
+                <textarea placeholder="简要介绍自己..." value={summary} onChange={e => setSummary(e.target.value)} rows={4} style={{ ...inputStyle, width: '100%' }} />
+              </Section>
+
+              <div style={{ textAlign: 'center', marginTop: '24px', marginBottom: '40px' }}>
+                <button onClick={handleSave} style={{ ...buttonStyle, backgroundColor: '#28a745', padding: '12px 32px', fontSize: '16px' }}>
+                  💾 保存简历
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeMenu === 'resumes' && (
+            <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+              <h1 style={{ fontSize: '28px', marginBottom: '8px', color: '#1a1a2e' }}>📋 我的简历</h1>
+              <p style={{ color: '#666', marginBottom: '24px' }}>共 {savedResumes.length} 份简历</p>
+              {savedResumes.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '60px', background: '#fff', borderRadius: '16px' }}>
+                  <p style={{ fontSize: '18px', color: '#999' }}>暂无简历，快去生成一份吧</p>
+                  <button onClick={() => setActiveMenu('generate')} style={buttonStyle}>开始创建</button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {savedResumes.map((resume) => (
+                    <div key={resume.id} style={{ background: '#fff', borderRadius: '12px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <h3 style={{ margin: '0 0 4px' }}>{resume.name || '未命名'}</h3>
+                          <p style={{ margin: '0', color: '#666', fontSize: '14px' }}>{resume.jobTitle || '暂无职位'} | 创建于 {resume.createdAt}</p>
+                        </div>
+                        <button onClick={() => loadResume(resume)} style={{ ...buttonStyle, padding: '6px 16px', fontSize: '14px' }}>编辑</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
-          </div>
-        )}
-      </main>
+          )}
+
+          {activeMenu === 'profile' && (
+            <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+              <h1 style={{ fontSize: '28px', marginBottom: '24px', color: '#1a1a2e' }}>👤 个人资料</h1>
+              <div style={{ background: '#fff', borderRadius: '16px', padding: '32px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+                <p style={{ textAlign: 'center', color: '#666', padding: '40px 0' }}>
+                  登录功能正在开发中...<br />
+                  目前简历数据保存在本地浏览器中
+                </p>
+                {isLoggedIn && (
+                  <button onClick={() => setIsLoggedIn(false)} style={{ ...buttonStyle, backgroundColor: '#dc3545', width: '100%' }}>退出登录</button>
+                )}
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
 
       {/* 登录弹窗 */}
       {showLoginModal && (
@@ -342,6 +377,12 @@ function App() {
           </div>
         </div>
       )}
+
+      {message && (
+        <div style={{ position: 'fixed', bottom: '24px', right: '24px', padding: '12px 20px', background: message.includes('成功') || message.includes('✅') ? '#28a745' : '#dc3545', color: '#fff', borderRadius: '8px', boxShadow: '0 2px 10px rgba(0,0,0,0.2)', zIndex: 1000 }}>
+          {message}
+        </div>
+      )}
     </div>
   );
 }
@@ -351,12 +392,6 @@ const Section: React.FC<{ title: string; children: React.ReactNode; highlight?: 
   <div style={{ marginBottom: '32px', background: highlight ? '#fff8e7' : '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
     <h3 style={{ marginBottom: '16px', fontSize: '18px', color: '#333' }}>{title}</h3>
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>{children}</div>
-  </div>
-);
-
-const MessageBanner: React.FC<{ message: string }> = ({ message }) => (
-  <div style={{ position: 'fixed', bottom: '24px', right: '24px', padding: '12px 20px', background: message.includes('成功') || message.includes('✅') ? '#28a745' : '#dc3545', color: '#fff', borderRadius: '8px', boxShadow: '0 2px 10px rgba(0,0,0,0.2)', zIndex: 1000 }}>
-    {message}
   </div>
 );
 

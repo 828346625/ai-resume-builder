@@ -1,0 +1,25 @@
+{
+  "name": "ai-resume-builder",
+  "version": "1.0.0",
+  "description": "- `/frontend` - React前端\r - `/backend` - Express后端",
+  "main": "index.js",
+"scripts": {
+  "start": "node index.js",
+  "dev": "nodemon index.js",
+  "test": "echo \"Error: no test specified\" && exit 1"
+},
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.1",
+    "express": "^5.2.1",
+    "openai": "^6.33.0"
+  },
+  "devDependencies": {
+    "mysql2": "^3.20.0",
+    "nodemon": "^3.1.14"
+  }
+}

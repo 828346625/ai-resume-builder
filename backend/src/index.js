@@ -8,6 +8,9 @@ const { generatePoints } = require('./services/aiService');//引入 AI 服务
 const app = express();
 app.use(cors());
 app.use(express.json());
+const userRoutes = require('./routes/user');
+const authenticateToken = require('./middleware/auth');
+app.use('/api/user', userRoutes);
 
 // 测试路由
 app.get('/', (req, res) => {
@@ -52,7 +55,7 @@ app.post('/api/ai/generate-points', async (req, res) => {
 });
 
 // ========== 保存简历接口 ==========
-app.post('/api/resume', async (req, res) => {
+app.post('/api/resume', authenticateToken, async (req, res) => {
   try {
     const {
       name,
@@ -64,6 +67,7 @@ app.post('/api/resume', async (req, res) => {
       educations,
       summary
     } = req.body;
+    const userId = req.userId;  // 从 token 获取用户ID
 
     // 验证必填字段
     if (!name) {
@@ -78,12 +82,12 @@ app.post('/api/resume', async (req, res) => {
     const workStr = workExperiences ? JSON.stringify(workExperiences) : null;
     const eduStr = educations ? JSON.stringify(educations) : null;
 
-    // 插入数据库
+    // 插入数据库，带上userId
     const [result] = await db.query(
-  `INSERT INTO resumes (name, jobTitle, email, phone, skills, workExperiences, educations, summary)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-  [name, jobTitle, email, phone, skillsStr, workStr, eduStr, summary]
-);
+      `INSERT INTO resumes (name, jobTitle, email, phone, skills, workExperiences, educations, summary, userId)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [name, jobTitle, email, phone, skillsStr, workStr, eduStr, summary, userId]
+    );
 
     res.json({
       code: 200,
@@ -102,24 +106,26 @@ app.post('/api/resume', async (req, res) => {
 });
 
 // ========== 获取简历列表 ==========
-app.get('/api/resumes', async (req, res) => {
+app.get('/api/resumes', authenticateToken, async (req, res) => {
   try {
+    const userId = req.userId;  // 从 token 获取用户ID
     // 分页参数：page=1&limit=10
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
     
-    // 查询总数
-    const [countResult] = await db.query('SELECT COUNT(*) as total FROM resumes');
+    // 查询总数，只统计当前用户的简历
+    const [countResult] = await db.query('SELECT COUNT(*) as total FROM resumes WHERE userId = ?', [userId]);
     const total = countResult[0].total;
     
-    // 查询分页数据
+    // 查询分页数据，只返回当前用户的简历
     const [rows] = await db.query(
       `SELECT id, name, jobTitle, email, phone, createdAt, updatedAt 
        FROM resumes 
+       WHERE userId = ?
        ORDER BY createdAt DESC 
        LIMIT ? OFFSET ?`,
-      [limit, offset]
+      [userId, limit, offset]
     );
     
     res.json({
@@ -145,11 +151,12 @@ app.get('/api/resumes', async (req, res) => {
 });
 
 // ========== 获取单份简历 ==========
-app.get('/api/resume/:id', async (req, res) => {
+app.get('/api/resume/:id', authenticateToken, async (req, res) => {
   try {
     const id = req.params.id;
+    const userId = req.userId;  // 从 token 获取用户ID
     
-    const [rows] = await db.query('SELECT * FROM resumes WHERE id = ?', [id]);
+    const [rows] = await db.query('SELECT * FROM resumes WHERE id = ? AND userId = ?', [id, userId]);
     
     if (rows.length === 0) {
       return res.status(404).json({
@@ -181,12 +188,13 @@ app.get('/api/resume/:id', async (req, res) => {
 });
 
 // ========== 删除简历 ==========
-app.delete('/api/resume/:id', async (req, res) => {
+app.delete('/api/resume/:id', authenticateToken, async (req, res) => {
   try {
     const id = req.params.id;
+    const userId = req.userId;  // 从 token 获取用户ID
     
-    // 先检查是否存在
-    const [check] = await db.query('SELECT id FROM resumes WHERE id = ?', [id]);
+    // 先检查是否存在，并且属于当前用户
+    const [check] = await db.query('SELECT id FROM resumes WHERE id = ? AND userId = ?', [id, userId]);
     if (check.length === 0) {
       return res.status(404).json({
         code: 404,
@@ -194,8 +202,8 @@ app.delete('/api/resume/:id', async (req, res) => {
       });
     }
     
-    // 执行删除
-    await db.query('DELETE FROM resumes WHERE id = ?', [id]);
+    // 执行删除，只删除当前用户的简历
+    await db.query('DELETE FROM resumes WHERE id = ? AND userId = ?', [id, userId]);
     
     res.json({
       code: 200,
@@ -214,9 +222,10 @@ app.delete('/api/resume/:id', async (req, res) => {
 });
 
 // ========== 更新简历 ==========
-app.put('/api/resume/:id', async (req, res) => {
+app.put('/api/resume/:id', authenticateToken, async (req, res) => {
   try {
     const id = req.params.id;
+    const userId = req.userId;  // 从 token 获取用户ID
     const {
       name,
       jobTitle,
@@ -236,8 +245,8 @@ app.put('/api/resume/:id', async (req, res) => {
       });
     }
 
-    // 先检查简历是否存在，并获取当前版本号
-    const [check] = await db.query('SELECT version FROM resumes WHERE id = ?', [id]);
+    // 先检查简历是否存在，并且属于当前用户
+    const [check] = await db.query('SELECT version FROM resumes WHERE id = ? AND userId = ?', [id, userId]);
     if (check.length === 0) {
       return res.status(404).json({
         code: 404,
@@ -253,14 +262,14 @@ app.put('/api/resume/:id', async (req, res) => {
     const workStr = workExperiences ? JSON.stringify(workExperiences) : null;
     const eduStr = educations ? JSON.stringify(educations) : null;
 
-    // 更新简历，版本号+1
+    // 更新简历，版本号+1，只更新当前用户的简历
     const [result] = await db.query(
       `UPDATE resumes 
        SET name = ?, jobTitle = ?, email = ?, phone = ?, 
            skills = ?, workExperiences = ?, educations = ?, summary = ?,
            version = ?, updatedAt = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-      [name, jobTitle, email, phone, skillsStr, workStr, eduStr, summary, newVersion, id]
+       WHERE id = ? AND userId = ?`,
+      [name, jobTitle, email, phone, skillsStr, workStr, eduStr, summary, newVersion, id, userId]
     );
 
     res.json({
@@ -283,12 +292,13 @@ app.put('/api/resume/:id', async (req, res) => {
 });
 
 // ========== 获取版本历史 ==========
-app.get('/api/resume/:id/versions', async (req, res) => {
+app.get('/api/resume/:id/versions', authenticateToken, async (req, res) => {
   try {
     const id = req.params.id;
+    const userId = req.userId;  // 从 token 获取用户ID
 
-    // 检查简历是否存在
-    const [check] = await db.query('SELECT id FROM resumes WHERE id = ?', [id]);
+    // 检查简历是否存在，并且属于当前用户
+    const [check] = await db.query('SELECT id FROM resumes WHERE id = ? AND userId = ?', [id, userId]);
     if (check.length === 0) {
       return res.status(404).json({
         code: 404,
@@ -300,8 +310,8 @@ app.get('/api/resume/:id/versions', async (req, res) => {
     const [rows] = await db.query(
       `SELECT id, name, jobTitle, email, phone, skills, workExperiences, educations, summary, version, createdAt, updatedAt
        FROM resumes 
-       WHERE id = ?`,
-      [id]
+       WHERE id = ? AND userId = ?`,
+      [id, userId]
     );
 
     // 解析JSON字段

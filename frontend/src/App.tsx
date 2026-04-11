@@ -32,7 +32,7 @@ interface Resume {
   updatedAt: string;
 }
 
-type MenuItem = 'generate' | 'resumes' | 'profile';
+type MenuItem = 'resumes' | 'profile';
 type View = 'home' | 'editor';
 
 // ========== 主组件 ==========
@@ -45,10 +45,12 @@ function App() {
   // 用户状态
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [username, setUsername] = useState('');
   
   // 简历数据
   const [resumes, setResumes] = useState<Resume[]>([]);
+  const [loading, setLoading] = useState(false);
 
   // 编辑页面的表单数据
   const [name, setName] = useState('');
@@ -68,22 +70,36 @@ function App() {
   const [aiLoading, setAiLoading] = useState(false);
   const [message, setMessage] = useState('');
 
-  // ========== 加载保存的简历 ==========
+  // ========== 检查登录状态 ==========
   useEffect(() => {
-    const saved = localStorage.getItem('resumes');
-    if (saved) {
-      try {
-        setResumes(JSON.parse(saved));
-      } catch (e) {
-        console.error('加载失败', e);
-      }
+    const token = localStorage.getItem('token');
+    const savedUsername = localStorage.getItem('username');
+    if (token && savedUsername) {
+      setIsLoggedIn(true);
+      setUsername(savedUsername);
+      fetchResumes();
     }
   }, []);
 
-  // ========== 保存简历到 localStorage ==========
-  const saveResumesToLocal = (newResumes: Resume[]) => {
-    setResumes(newResumes);
-    localStorage.setItem('resumes', JSON.stringify(newResumes));
+  // ========== 从后端加载简历列表 ==========
+  const fetchResumes = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch('http://localhost:5000/api/resumes', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.code === 200) {
+        setResumes(data.data.list);
+      }
+    } catch (error) {
+      console.error('加载简历失败', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ========== 新建简历 ==========
@@ -127,14 +143,20 @@ function App() {
   };
 
   // ========== 保存当前编辑的简历 ==========
-  const handleSaveResume = () => {
+  const handleSaveResume = async () => {
     if (!name.trim()) {
       setMessage('请填写姓名');
       return;
     }
 
-    const newResume: Resume = {
-      id: editingResumeId || Date.now().toString(),
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setMessage('请先登录');
+      setShowLoginModal(true);
+      return;
+    }
+
+    const resumeData = {
       name,
       jobTitle,
       email,
@@ -142,34 +164,61 @@ function App() {
       skills: skills.split(',').map(s => s.trim()).filter(s => s),
       workExperiences: workExperiences.filter(exp => exp.company || exp.position),
       educations: educations.filter(edu => edu.school || edu.degree),
-      summary,
-      createdAt: editingResumeId 
-        ? (resumes.find(r => r.id === editingResumeId)?.createdAt || new Date().toLocaleString())
-        : new Date().toLocaleString(),
-      updatedAt: new Date().toLocaleString()
+      summary
     };
 
-    if (editingResumeId) {
-      const newResumes = resumes.map(r => r.id === editingResumeId ? newResume : r);
-      saveResumesToLocal(newResumes);
-      setMessage('简历更新成功！');
-    } else {
-      saveResumesToLocal([newResume, ...resumes]);
-      setMessage('简历保存成功！');
-    }
+    setLoading(true);
+    try {
+      const url = editingResumeId 
+        ? `http://localhost:5000/api/resume/${editingResumeId}`
+        : 'http://localhost:5000/api/resume';
+      
+      const method = editingResumeId ? 'PUT' : 'POST';
 
-    setTimeout(() => setMessage(''), 2000);
-    setCurrentView('home');
+      const res = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(resumeData)
+      });
+      const data = await res.json();
+
+      if (data.code === 200) {
+        setMessage(editingResumeId ? '简历更新成功！' : '简历保存成功！');
+        await fetchResumes();
+        setCurrentView('home');
+      } else {
+        setMessage('保存失败：' + data.message);
+      }
+    } catch (error) {
+      setMessage('保存失败：' + (error as Error).message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ========== 删除简历 ==========
-  const deleteResume = (id: string, e: React.MouseEvent) => {
+  const deleteResume = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm('确定要删除这份简历吗？')) {
-      const newResumes = resumes.filter(r => r.id !== id);
-      saveResumesToLocal(newResumes);
-      setMessage('删除成功');
-      setTimeout(() => setMessage(''), 2000);
+    if (!confirm('确定要删除这份简历吗？')) return;
+
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`http://localhost:5000/api/resume/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.code === 200) {
+        setMessage('删除成功');
+        await fetchResumes();
+      } else {
+        setMessage('删除失败：' + data.message);
+      }
+    } catch (error) {
+      setMessage('删除失败：' + (error as Error).message);
     }
   };
 
@@ -225,24 +274,70 @@ function App() {
   };
 
   // ========== 登录处理 ==========
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const formData = new FormData(e.target as HTMLFormElement);
     const inputUsername = formData.get('username') as string;
     const inputPassword = formData.get('password') as string;
-    
-    if (inputUsername && inputPassword) {
-      setUsername(inputUsername);
-      setIsLoggedIn(true);
-      setShowLoginModal(false);
-      setMessage(`欢迎回来，${inputUsername}！`);
-      setTimeout(() => setMessage(''), 2000);
+
+    try {
+      const res = await fetch('http://localhost:5000/api/user/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: inputUsername, password: inputPassword })
+      });
+      const data = await res.json();
+
+      if (data.code === 200) {
+        localStorage.setItem('token', data.data.token);
+        localStorage.setItem('username', inputUsername);
+        setIsLoggedIn(true);
+        setUsername(inputUsername);
+        setShowLoginModal(false);
+        setMessage(`欢迎回来，${inputUsername}！`);
+        await fetchResumes();
+      } else {
+        setMessage('登录失败：' + data.message);
+      }
+    } catch (error) {
+      setMessage('登录失败，请检查后端是否启动');
+    }
+  };
+
+  // ========== 注册处理 ==========
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const formData = new FormData(e.target as HTMLFormElement);
+    const inputUsername = formData.get('username') as string;
+    const inputPassword = formData.get('password') as string;
+    const inputEmail = formData.get('email') as string;
+
+    try {
+      const res = await fetch('http://localhost:5000/api/user/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: inputUsername, password: inputPassword, email: inputEmail })
+      });
+      const data = await res.json();
+
+      if (data.code === 200 || data.code === 201) {
+        setMessage('注册成功，请登录');
+        setShowRegisterModal(false);
+        setShowLoginModal(true);
+      } else {
+        setMessage('注册失败：' + data.message);
+      }
+    } catch (error) {
+      setMessage('注册失败，请检查后端是否启动');
     }
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('username');
     setIsLoggedIn(false);
     setUsername('');
+    setResumes([]);
     setMessage('已退出登录');
     setTimeout(() => setMessage(''), 2000);
   };
@@ -252,45 +347,44 @@ function App() {
     <div style={{ padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 'normal' }}>
-          {activeMenu === 'resumes' ? '📋 我的简历' : activeMenu === 'generate' ? '✨ 生成简历' : '👤 个人资料'}
+          {activeMenu === 'resumes' ? '📋 我的简历' : '👤 个人资料'}
         </h2>
       </div>
 
       {activeMenu === 'resumes' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' }}>
-          {/* 新建简历卡片 */}
-          <div onClick={createNewResume} style={newCardStyle}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>✨</div>
-            <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px' }}>新建简历</div>
-            <div style={{ fontSize: '14px', color: '#888' }}>点击创建一份新的简历</div>
-          </div>
+        <>
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '60px' }}>加载中...</div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' }}>
+              {/* 新建简历卡片 */}
+              <div onClick={createNewResume} style={newCardStyle}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>✨</div>
+                <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px' }}>新建简历</div>
+                <div style={{ fontSize: '14px', color: '#888' }}>点击创建一份新的简历</div>
+              </div>
 
-          {/* 已有简历卡片 */}
-          {resumes.map((resume) => (
-            <div key={resume.id} onClick={() => editResume(resume)} style={cardItemStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ fontSize: '32px' }}>📄</div>
-                <button onClick={(e) => deleteResume(resume.id, e)} style={deleteIconStyle}>🗑️</button>
-              </div>
-              <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {resume.name || '未命名'}
-              </div>
-              <div style={{ fontSize: '13px', color: '#666', marginTop: '4px' }}>
-                {resume.jobTitle || '暂无职位'}
-              </div>
-              <div style={{ fontSize: '12px', color: '#999', marginTop: '12px' }}>
-                更新于 {resume.updatedAt || resume.createdAt}
-              </div>
+              {/* 已有简历卡片 */}
+              {resumes.map((resume) => (
+                <div key={resume.id} onClick={() => editResume(resume)} style={cardItemStyle}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ fontSize: '32px' }}>📄</div>
+                    <button onClick={(e) => deleteResume(resume.id, e)} style={deleteIconStyle}>🗑️</button>
+                  </div>
+                  <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {resume.name || '未命名'}
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#666', marginTop: '4px' }}>
+                    {resume.jobTitle || '暂无职位'}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#999', marginTop: '12px' }}>
+                    更新于 {new Date(resume.updatedAt).toLocaleString()}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
-
-      {activeMenu === 'generate' && (
-        <div style={{ textAlign: 'center', padding: '60px', background: '#fff', borderRadius: '16px' }}>
-          <p style={{ fontSize: '18px', color: '#666' }}>点击"新建简历"开始创建</p>
-          <button onClick={createNewResume} style={{ ...buttonStyle, marginTop: '16px' }}>+ 新建简历</button>
-        </div>
+          )}
+        </>
       )}
 
       {activeMenu === 'profile' && (
@@ -311,7 +405,7 @@ function App() {
         </div>
       )}
 
-      {resumes.length === 0 && activeMenu === 'resumes' && (
+      {resumes.length === 0 && activeMenu === 'resumes' && !loading && (
         <div style={{ textAlign: 'center', padding: '60px', color: '#999' }}>
           <p>暂无简历，点击"新建简历"开始创建</p>
         </div>
@@ -394,8 +488,8 @@ function App() {
         </Section>
 
         <div style={{ textAlign: 'center', marginTop: '24px', marginBottom: '40px' }}>
-          <button onClick={handleSaveResume} style={{ ...buttonStyle, backgroundColor: '#28a745', padding: '12px 32px', fontSize: '16px' }}>
-            💾 保存简历
+          <button onClick={handleSaveResume} disabled={loading} style={{ ...buttonStyle, backgroundColor: '#28a745', padding: '12px 32px', fontSize: '16px' }}>
+            {loading ? '保存中...' : '💾 保存简历'}
           </button>
         </div>
       </div>
@@ -531,16 +625,41 @@ function App() {
       {showLoginModal && (
         <div style={modalOverlayStyle} onClick={() => setShowLoginModal(false)}>
           <div style={modalStyle} onClick={e => e.stopPropagation()}>
-            <h2 style={{ marginBottom: '20px' }}>登录 / 注册</h2>
+            <h2 style={{ marginBottom: '20px' }}>登录</h2>
             <form onSubmit={handleLogin}>
               <input type="text" name="username" placeholder="用户名" style={{ ...inputStyle, marginBottom: '12px' }} required />
               <input type="password" name="password" placeholder="密码" style={{ ...inputStyle, marginBottom: '20px' }} required />
               <button type="submit" style={{ ...buttonStyle, width: '100%' }}>登录</button>
             </form>
             <p style={{ fontSize: '12px', color: '#999', marginTop: '16px', textAlign: 'center' }}>
-              演示模式，任意用户名密码均可登录
+              还没有账号？{' '}
+              <span onClick={() => { setShowLoginModal(false); setShowRegisterModal(true); }} style={{ color: '#007bff', cursor: 'pointer' }}>
+                立即注册
+              </span>
             </p>
             <button onClick={() => setShowLoginModal(false)} style={{ ...outlineButtonStyle, width: '100%', marginTop: '12px' }}>取消</button>
+          </div>
+        </div>
+      )}
+
+      {/* 注册弹窗 */}
+      {showRegisterModal && (
+        <div style={modalOverlayStyle} onClick={() => setShowRegisterModal(false)}>
+          <div style={modalStyle} onClick={e => e.stopPropagation()}>
+            <h2 style={{ marginBottom: '20px' }}>注册</h2>
+            <form onSubmit={handleRegister}>
+              <input type="text" name="username" placeholder="用户名" style={{ ...inputStyle, marginBottom: '12px' }} required />
+              <input type="email" name="email" placeholder="邮箱" style={{ ...inputStyle, marginBottom: '12px' }} required />
+              <input type="password" name="password" placeholder="密码" style={{ ...inputStyle, marginBottom: '20px' }} required />
+              <button type="submit" style={{ ...buttonStyle, width: '100%' }}>注册</button>
+            </form>
+            <p style={{ fontSize: '12px', color: '#999', marginTop: '16px', textAlign: 'center' }}>
+              已有账号？{' '}
+              <span onClick={() => { setShowRegisterModal(false); setShowLoginModal(true); }} style={{ color: '#007bff', cursor: 'pointer' }}>
+                去登录
+              </span>
+            </p>
+            <button onClick={() => setShowRegisterModal(false)} style={{ ...outlineButtonStyle, width: '100%', marginTop: '12px' }}>取消</button>
           </div>
         </div>
       )}

@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import './index.css';
 
-// ========== 类型定义 ==========
+// 类型定义
 interface WorkExperience {
   id: number;
   company: string;
@@ -18,792 +19,824 @@ interface Education {
   endDate: string;
 }
 
-interface Resume {
-  id: string;
+const DEMO_USER = {
+  name: '王小明',
+  email: 'xiaoming.wang@example.com',
+  avatar: 'https://ui-avatars.com/api/?background=3b82f6&color=fff&name=王小明',
+};
+
+// ========== 登录模态框组件 ==========
+interface LoginModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onLogin: (e: React.FormEvent) => void;
+  email: string;
+  setEmail: (value: string) => void;
+  password: string;
+  setPassword: (value: string) => void;
+  error: string;
+}
+
+const LoginModal: React.FC<LoginModalProps> = ({
+  isOpen,
+  onClose,
+  onLogin,
+  email,
+  setEmail,
+  password,
+  setPassword,
+  error,
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 text-xl"
+        >
+          ×
+        </button>
+        <h2 className="text-2xl font-bold text-center mb-6">登录</h2>
+        <form onSubmit={onLogin}>
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-1">邮箱</label>
+            <input
+              type="email"
+              className="w-full border border-gray-300 rounded-lg p-2"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-1">密码</label>
+            <input
+              type="password"
+              className="w-full border border-gray-300 rounded-lg p-2"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
+          <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg transition">
+            登录
+          </button>
+        </form>
+        <p className="text-center text-sm text-gray-500 mt-4">演示账号：任意邮箱 + 任意密码</p>
+      </div>
+    </div>
+  );
+};
+
+// ========== 简历编辑组件（移到外部避免焦点丢失） ==========
+interface EditorViewProps {
+  name: string;
+  setName: (value: string) => void;
+  jobTitle: string;
+  setJobTitle: (value: string) => void;
+  email: string;
+  setEmail: (value: string) => void;
+  phone: string;
+  setPhone: (value: string) => void;
+  skills: string;
+  setSkills: (value: string) => void;
+  summary: string;
+  setSummary: (value: string) => void;
+  generatedSummary: string;
+  setGeneratedSummary: (value: string) => void;
+  isGenerating: boolean;
+  setIsGenerating: (value: boolean) => void;
+  workExperiences: WorkExperience[];
+  setWorkExperiences: React.Dispatch<React.SetStateAction<WorkExperience[]>>;
+  educations: Education[];
+  setEducations: React.Dispatch<React.SetStateAction<Education[]>>;
+  nameError: string;
+  setNameError: (value: string) => void;
+  emailError: string;
+  setEmailError: (value: string) => void;
+  phoneError: string;
+  setPhoneError: (value: string) => void;
+  onAIGenerate: () => void;
+  onSave: () => void;
+}
+
+const EditorView: React.FC<EditorViewProps> = ({
+  name,
+  setName,
+  jobTitle,
+  setJobTitle,
+  email,
+  setEmail,
+  phone,
+  setPhone,
+  skills,
+  setSkills,
+  summary,
+  setSummary,
+  generatedSummary,
+  setGeneratedSummary,
+  isGenerating,
+  setIsGenerating,
+  workExperiences,
+  setWorkExperiences,
+  educations,
+  setEducations,
+  nameError,
+  setNameError,
+  emailError,
+  setEmailError,
+  phoneError,
+  setPhoneError,
+  onAIGenerate,
+  onSave,
+}) => {
+  // 工作经历操作
+  const addWork = () => {
+    setWorkExperiences([
+      ...workExperiences,
+      { id: Date.now(), company: '', position: '', startDate: '', endDate: '', description: '' },
+    ]);
+  };
+  const updateWork = (id: number, field: keyof WorkExperience, value: string) => {
+    setWorkExperiences(workExperiences.map(w => (w.id === id ? { ...w, [field]: value } : w)));
+  };
+  const removeWork = (id: number) => setWorkExperiences(workExperiences.filter(w => w.id !== id));
+
+  // 教育经历操作
+  const addEdu = () => {
+    setEducations([...educations, { id: Date.now(), school: '', degree: '', startDate: '', endDate: '' }]);
+  };
+  const updateEdu = (id: number, field: keyof Education, value: string) => {
+    setEducations(educations.map(e => (e.id === id ? { ...e, [field]: value } : e)));
+  };
+  const removeEdu = (id: number) => setEducations(educations.filter(e => e.id !== id));
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-6">
+      {/* 基本信息 */}
+      <div className="bg-white rounded-xl shadow-sm p-6">
+        <h2 className="text-xl font-bold mb-4">基本信息</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <input
+              className="border rounded-lg p-2 w-full"
+              placeholder="姓名（必填，2-20个字符）"
+              value={name}
+              onChange={e => {
+                setName(e.target.value);
+                if (e.target.value.trim().length < 2 || e.target.value.trim().length > 20) {
+                  setNameError('姓名长度应为2-20个字符');
+                } else {
+                  setNameError('');
+                }
+              }}
+            />
+            {nameError && <p className="text-red-500 text-xs mt-1">{nameError}</p>}
+          </div>
+          <input
+            className="border rounded-lg p-2"
+            placeholder="职位（如：前端开发工程师）"
+            value={jobTitle}
+            onChange={e => setJobTitle(e.target.value)}
+          />
+          <div>
+            <input
+              type="email"
+              className="border rounded-lg p-2 w-full"
+              placeholder="邮箱（例如：name@example.com）"
+              value={email}
+              onChange={e => {
+                setEmail(e.target.value);
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(e.target.value)) {
+                  setEmailError('请输入正确的邮箱格式');
+                } else {
+                  setEmailError('');
+                }
+              }}
+            />
+            {emailError && <p className="text-red-500 text-xs mt-1">{emailError}</p>}
+          </div>
+          <div>
+            <input
+              type="tel"
+              pattern="1[3-9]\d{9}"
+              title="请输入11位手机号"
+              className="border rounded-lg p-2 w-full"
+              placeholder="手机号（11位数字）"
+              value={phone}
+              onChange={e => {
+                const val = e.target.value;
+                setPhone(val);
+                const phoneRegex = /^1[3-9]\d{9}$/;
+                if (!phoneRegex.test(val)) {
+                  setPhoneError('请输入11位手机号');
+                } else {
+                  setPhoneError('');
+                }
+              }}
+            />
+            {phoneError && <p className="text-red-500 text-xs mt-1">{phoneError}</p>}
+          </div>
+        </div>
+        <div className="mt-4">
+          <label className="block text-sm font-medium mb-1">技能（逗号分隔）</label>
+          <input
+            className="w-full border rounded-lg p-2"
+            placeholder="React, TypeScript, Node.js"
+            value={skills}
+            onChange={e => setSkills(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* AI 智能生成 */}
+      <div className="bg-white rounded-xl shadow-sm p-6">
+        <h3 className="text-lg font-bold mb-2">🤖 AI 智能生成</h3>
+        <p className="text-sm text-gray-500 mb-3">
+          填写工作经历描述，AI 将为你生成专业简历介绍（基于第一条工作经历）
+        </p>
+        <textarea
+          rows={4}
+          className="w-full border rounded-lg p-3 mb-3"
+          placeholder="例如：在某某公司负责前端开发，主导了三个大型项目，用户量增长50%..."
+          value={workExperiences[0]?.description || ''}
+          onChange={e => {
+            if (workExperiences.length > 0) {
+              updateWork(workExperiences[0].id, 'description', e.target.value);
+            }
+          }}
+        />
+        <button
+          onClick={onAIGenerate}
+          disabled={isGenerating}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition disabled:opacity-50"
+        >
+          {isGenerating ? '生成中...' : '✨ 生成简历介绍'}
+        </button>
+        {generatedSummary && (
+          <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+            <p className="whitespace-pre-wrap text-gray-700">{generatedSummary}</p>
+          </div>
+        )}
+      </div>
+
+      {/* 工作经历 */}
+      <div className="bg-white rounded-xl shadow-sm p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-bold">💼 工作经历</h3>
+          <button onClick={addWork} className="text-blue-600 text-sm">
+            + 添加
+          </button>
+        </div>
+        {workExperiences.length === 0 && (
+          <div className="text-gray-400 text-sm mb-2">暂无工作经历，点击右上方按钮添加</div>
+        )}
+        {workExperiences.map((exp, idx) => (
+          <div key={exp.id} className="border-t pt-4 mt-4 first:border-0 first:pt-0">
+            <div className="flex justify-between mb-2">
+              <span className="font-medium">经历 {idx + 1}</span>
+              {workExperiences.length > 1 && (
+                <button onClick={() => removeWork(exp.id)} className="text-red-500 text-sm">
+                  删除
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <input
+                className="border rounded p-2"
+                placeholder="公司名称"
+                value={exp.company}
+                onChange={e => updateWork(exp.id, 'company', e.target.value)}
+              />
+              <input
+                className="border rounded p-2"
+                placeholder="职位"
+                value={exp.position}
+                onChange={e => updateWork(exp.id, 'position', e.target.value)}
+              />
+              <input
+                className="border rounded p-2"
+                placeholder="开始时间（如：2020-01）"
+                value={exp.startDate}
+                onChange={e => updateWork(exp.id, 'startDate', e.target.value)}
+              />
+              <input
+                className="border rounded p-2"
+                placeholder="结束时间（如：2023-12）"
+                value={exp.endDate}
+                onChange={e => updateWork(exp.id, 'endDate', e.target.value)}
+              />
+            </div>
+            <textarea
+              className="w-full border rounded p-2 mt-3"
+              rows={2}
+              placeholder="工作描述"
+              value={exp.description}
+              onChange={e => updateWork(exp.id, 'description', e.target.value)}
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* 教育经历 */}
+      <div className="bg-white rounded-xl shadow-sm p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-bold">🎓 教育经历</h3>
+          <button onClick={addEdu} className="text-blue-600 text-sm">
+            + 添加
+          </button>
+        </div>
+        {educations.length === 0 && (
+          <div className="text-gray-400 text-sm mb-2">暂无教育背景，点击上方按钮添加</div>
+        )}
+        {educations.map((edu, idx) => (
+          <div key={edu.id} className="border-t pt-4 mt-4 first:border-0 first:pt-0">
+            <div className="flex justify-between mb-2">
+              <span className="font-medium">教育 {idx + 1}</span>
+              {educations.length > 1 && (
+                <button onClick={() => removeEdu(edu.id)} className="text-red-500 text-sm">
+                  删除
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <input
+                className="border rounded p-2"
+                placeholder="学校名称"
+                value={edu.school}
+                onChange={e => updateEdu(edu.id, 'school', e.target.value)}
+              />
+              <input
+                className="border rounded p-2"
+                placeholder="学位（如：本科）"
+                value={edu.degree}
+                onChange={e => updateEdu(edu.id, 'degree', e.target.value)}
+              />
+              <input
+                className="border rounded p-2"
+                placeholder="开始时间"
+                value={edu.startDate}
+                onChange={e => updateEdu(edu.id, 'startDate', e.target.value)}
+              />
+              <input
+                className="border rounded p-2"
+                placeholder="结束时间"
+                value={edu.endDate}
+                onChange={e => updateEdu(edu.id, 'endDate', e.target.value)}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex justify-end">
+        <button onClick={onSave} className="bg-green-600 hover:bg-green-700 text-white px-8 py-2 rounded-lg">
+          保存简历
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ========== 简历预览组件 ==========
+interface PreviewViewProps {
   name: string;
   jobTitle: string;
   email: string;
   phone: string;
-  skills: string[];
-  workExperiences: WorkExperience[];
-  educations: Education[];
   summary: string;
-  createdAt: string;
-  updatedAt: string;
+  generatedSummary: string;
+  skills: string;
+  onBack: () => void;
 }
 
-type MenuItem = 'resumes' | 'profile';
-type View = 'home' | 'editor';
+const PreviewView: React.FC<PreviewViewProps> = ({
+  name,
+  jobTitle,
+  email,
+  phone,
+  summary,
+  generatedSummary,
+  skills,
+  onBack,
+}) => {
+  const displaySummary = summary || generatedSummary || '暂无介绍，请先在编辑页生成 AI 内容。';
+  return (
+    <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-sm p-8">
+      <div className="flex items-center mb-6">
+        <button
+          onClick={onBack}
+          className="flex items-center text-blue-600 hover:text-blue-800 transition mr-4"
+        >
+          ← 返回编辑
+        </button>
+        <h2 className="text-2xl font-bold">简历预览</h2>
+      </div>
+      <div className="text-center border-b pb-6">
+        <h1 className="text-3xl font-bold">{name || '姓名'}</h1>
+        <p className="text-gray-600 mt-1">{jobTitle || '职位'}</p>
+        <div className="flex justify-center gap-4 mt-3 text-sm text-gray-500">
+          <span>{email}</span>
+          <span>{phone}</span>
+        </div>
+      </div>
+      <div className="mt-6">
+        <h3 className="text-lg font-semibold text-blue-600 border-l-4 border-blue-600 pl-3">个人简介</h3>
+        <p className="mt-2 text-gray-700 whitespace-pre-wrap">{displaySummary}</p>
+      </div>
+      <div className="mt-6">
+        <h3 className="text-lg font-semibold text-blue-600 border-l-4 border-blue-600 pl-3">技能</h3>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {skills.split(',').map((s, i) => s.trim() && <span key={i} className="bg-gray-100 px-3 py-1 rounded-full text-sm">{s.trim()}</span>)}
+        </div>
+      </div>
+    </div>
+  );
+};
 
-// ========== 主组件 ==========
+// ========== 账号设置组件 ==========
+interface SettingsViewProps {
+  onBack: () => void;
+}
+
+const SettingsView: React.FC<SettingsViewProps> = ({ onBack }) => {
+  return (
+    <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-sm p-6">
+      <div className="flex items-center mb-6">
+        <button
+          onClick={onBack}
+          className="flex items-center text-blue-600 hover:text-blue-800 transition mr-4"
+        >
+          ← 返回
+        </button>
+        <h2 className="text-xl font-bold">账号设置</h2>
+      </div>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">用户名</label>
+          <input className="w-full border rounded-lg p-2" defaultValue={DEMO_USER.name} />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">邮箱</label>
+          <input className="w-full border rounded-lg p-2" defaultValue={DEMO_USER.email} />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">新密码</label>
+          <input type="password" className="w-full border rounded-lg p-2" placeholder="留空则不修改" />
+        </div>
+        <button className="bg-blue-600 text-white px-4 py-2 rounded-lg">保存修改</button>
+      </div>
+    </div>
+  );
+};
+
+// ========== 主应用 ==========
 function App() {
-  // 页面状态
-  const [activeMenu, setActiveMenu] = useState<MenuItem>('resumes');
-  const [currentView, setCurrentView] = useState<View>('home');
-  const [editingResumeId, setEditingResumeId] = useState<string | null>(null);
-  
-  // 用户状态
+  // 全局状态
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [activeMenu, setActiveMenu] = useState('home');
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [showRegisterModal, setShowRegisterModal] = useState(false);
-  const [username, setUsername] = useState('');
-  
-  // 简历数据
-  const [resumes, setResumes] = useState<Resume[]>([]);
-  const [loading, setLoading] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
-  // 编辑页面的表单数据
+  // 登录表单状态
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+
+  // 简历表单状态
   const [name, setName] = useState('');
   const [jobTitle, setJobTitle] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [skills, setSkills] = useState('');
   const [summary, setSummary] = useState('');
+  const [generatedSummary, setGeneratedSummary] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  // 初始化一条空工作经历，保证 AI 生成区的 textarea 可输入
   const [workExperiences, setWorkExperiences] = useState<WorkExperience[]>([
-    { id: Date.now(), company: '', position: '', startDate: '', endDate: '', description: '' }
+    { id: Date.now(), company: '', position: '', startDate: '', endDate: '', description: '' },
   ]);
-  const [educations, setEducations] = useState<Education[]>([
-    { id: Date.now(), school: '', degree: '', startDate: '', endDate: '' }
-  ]);
+  const [educations, setEducations] = useState<Education[]>([]);
 
-  const [aiInput, setAiInput] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
-  const [message, setMessage] = useState('');
+  // 校验错误信息
+  const [nameError, setNameError] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
 
-  // ========== 检查登录状态 ==========
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    const savedUsername = localStorage.getItem('username');
-    if (token && savedUsername) {
+  // 模拟登录
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (loginEmail && loginPassword) {
       setIsLoggedIn(true);
-      setUsername(savedUsername);
-      fetchResumes();
-    }
-  }, []);
-
-  // ========== 从后端加载简历列表 ==========
-  const fetchResumes = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
-    setLoading(true);
-    try {
-      const res = await fetch('http://localhost:5000/api/resumes', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (data.code === 200) {
-        setResumes(data.data.list);
-      }
-    } catch (error) {
-      console.error('加载简历失败', error);
-    } finally {
-      setLoading(false);
+      setShowLoginModal(false);
+      setLoginError('');
+      setActiveMenu('resume');
+      // 清空之前的数据（可选）
+      setSkills('');
+      setEmail(loginEmail);
+      setGeneratedSummary('');
+      setName('');
+      setJobTitle('');
+      setPhone('');
+      setSummary('');
+      setWorkExperiences([{ id: Date.now(), company: '', position: '', startDate: '', endDate: '', description: '' }]);
+      setEducations([]);
+      setNameError('');
+      setEmailError('');
+      setPhoneError('');
+    } else {
+      setLoginError('请输入邮箱和密码');
     }
   };
 
-  // ========== 新建简历 ==========
-  const createNewResume = () => {
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    setIsUserMenuOpen(false);
+    setActiveMenu('home');
     setName('');
     setJobTitle('');
     setEmail('');
     setPhone('');
     setSkills('');
     setSummary('');
+    setGeneratedSummary('');
     setWorkExperiences([{ id: Date.now(), company: '', position: '', startDate: '', endDate: '', description: '' }]);
-    setEducations([{ id: Date.now(), school: '', degree: '', startDate: '', endDate: '' }]);
-    setAiInput('');
-    setEditingResumeId(null);
-    setCurrentView('editor');
+    setEducations([]);
+    setNameError('');
+    setEmailError('');
+    setPhoneError('');
   };
 
-  // ========== 编辑简历 ==========
-  const editResume = (resume: Resume) => {
-    setName(resume.name || '');
-    setJobTitle(resume.jobTitle || '');
-    setEmail(resume.email || '');
-    setPhone(resume.phone || '');
-    setSkills((resume.skills || []).join(', '));
-    setSummary(resume.summary || '');
-    
-    if (resume.workExperiences && resume.workExperiences.length > 0) {
-      setWorkExperiences(resume.workExperiences);
-    } else {
-      setWorkExperiences([{ id: Date.now(), company: '', position: '', startDate: '', endDate: '', description: '' }]);
-    }
-    
-    if (resume.educations && resume.educations.length > 0) {
-      setEducations(resume.educations);
-    } else {
-      setEducations([{ id: Date.now(), school: '', degree: '', startDate: '', endDate: '' }]);
-    }
-    
-    setEditingResumeId(resume.id);
-    setCurrentView('editor');
+  const openSettings = () => {
+    setActiveMenu('settings');
+    setIsUserMenuOpen(false);
   };
 
-  // ========== 保存当前编辑的简历 ==========
-  const handleSaveResume = async () => {
-    if (!name.trim()) {
-      setMessage('请填写姓名');
-      return;
-    }
-
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setMessage('请先登录');
-      setShowLoginModal(true);
-      return;
-    }
-
-    const resumeData = {
-      name,
-      jobTitle,
-      email,
-      phone,
-      skills: skills.split(',').map(s => s.trim()).filter(s => s),
-      workExperiences: workExperiences.filter(exp => exp.company || exp.position),
-      educations: educations.filter(edu => edu.school || edu.degree),
-      summary
+  // 点击外部关闭用户菜单
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
     };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
-    setLoading(true);
-    try {
-      const url = editingResumeId 
-        ? `http://localhost:5000/api/resume/${editingResumeId}`
-        : 'http://localhost:5000/api/resume';
-      
-      const method = editingResumeId ? 'PUT' : 'POST';
-
-      const res = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(resumeData)
-      });
-      const data = await res.json();
-
-      if (data.code === 200) {
-        setMessage(editingResumeId ? '简历更新成功！' : '简历保存成功！');
-        await fetchResumes();
-        setCurrentView('home');
-      } else {
-        setMessage('保存失败：' + data.message);
-      }
-    } catch (error) {
-      setMessage('保存失败：' + (error as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ========== 删除简历 ==========
-  const deleteResume = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!confirm('确定要删除这份简历吗？')) return;
-
-    const token = localStorage.getItem('token');
-    try {
-      const res = await fetch(`http://localhost:5000/api/resume/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (data.code === 200) {
-        setMessage('删除成功');
-        await fetchResumes();
-      } else {
-        setMessage('删除失败：' + data.message);
-      }
-    } catch (error) {
-      setMessage('删除失败：' + (error as Error).message);
-    }
-  };
-
-  // ========== 工作经历操作 ==========
-  const addWorkExperience = () => {
-    setWorkExperiences([...workExperiences, { id: Date.now(), company: '', position: '', startDate: '', endDate: '', description: '' }]);
-  };
-  const removeWorkExperience = (id: number) => {
-    if (workExperiences.length > 1) setWorkExperiences(workExperiences.filter(exp => exp.id !== id));
-  };
-  const updateWorkExperience = (id: number, field: keyof WorkExperience, value: string) => {
-    setWorkExperiences(workExperiences.map(exp => exp.id === id ? { ...exp, [field]: value } : exp));
-  };
-
-  // ========== 教育经历操作 ==========
-  const addEducation = () => {
-    setEducations([...educations, { id: Date.now(), school: '', degree: '', startDate: '', endDate: '' }]);
-  };
-  const removeEducation = (id: number) => {
-    if (educations.length > 1) setEducations(educations.filter(edu => edu.id !== id));
-  };
-  const updateEducation = (id: number, field: keyof Education, value: string) => {
-    setEducations(educations.map(edu => edu.id === id ? { ...edu, [field]: value } : edu));
-  };
-
-  // ========== AI 生成 ==========
+  // AI 生成
   const handleAIGenerate = async () => {
-    if (!aiInput.trim()) { setMessage('请输入工作描述'); return; }
-    setAiLoading(true);
-    setMessage('');
+    const firstExp = workExperiences[0];
+    const workDesc = firstExp?.description?.trim();
+    if (!workDesc) {
+      alert('请在工作经历中填写至少一段工作描述（第一条经历）');
+      return;
+    }
+    setIsGenerating(true);
     try {
-      const res = await fetch('http://localhost:5000/api/ai/generate-points', {
+      const res = await fetch('http://localhost:3001/api/resume/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workDescription: aiInput })
+        body: JSON.stringify({ experience: workDesc, skills: skills.split(',').map(s => s.trim()) }),
       });
       const data = await res.json();
-      if (data.code === 200 && data.data.points) {
-        const latestWork = workExperiences[workExperiences.length - 1];
-        if (latestWork) {
-          const newDescription = latestWork.description ? latestWork.description + '\n' + data.data.points.join('\n') : data.data.points.join('\n');
-          updateWorkExperience(latestWork.id, 'description', newDescription);
-        }
-        setMessage('✅ AI 生成成功！已添加到工作描述中');
+      if (data.success) {
+        setGeneratedSummary(data.data.summary);
+        setSummary(data.data.summary);
       } else {
-        setMessage('生成失败：' + (data.message || '未知错误'));
+        setGeneratedSummary('生成失败，请稍后重试');
       }
     } catch (error) {
-      setMessage('⚠️ 后端未启动，请先启动后端服务');
-    } finally {
-      setAiLoading(false);
+      // 模拟生成
+      setTimeout(() => {
+        const mock = `基于您的工作经历（${workDesc.slice(0, 60)}...），我们为您生成了专业的自我评价：\n\n具有扎实的前端开发能力，善于团队协作，能够独立负责项目模块。`;
+        setGeneratedSummary(mock);
+        setSummary(mock);
+        setIsGenerating(false);
+      }, 1000);
+      return;
     }
+    setIsGenerating(false);
   };
 
-  // ========== 登录处理 ==========
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const formData = new FormData(e.target as HTMLFormElement);
-    const inputUsername = formData.get('username') as string;
-    const inputPassword = formData.get('password') as string;
-
-    try {
-      const res = await fetch('http://localhost:5000/api/user/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: inputUsername, password: inputPassword })
-      });
-      const data = await res.json();
-
-      if (data.code === 200) {
-        localStorage.setItem('token', data.data.token);
-        localStorage.setItem('username', inputUsername);
-        setIsLoggedIn(true);
-        setUsername(inputUsername);
-        setShowLoginModal(false);
-        setMessage(`欢迎回来，${inputUsername}！`);
-        await fetchResumes();
-      } else {
-        setMessage('登录失败：' + data.message);
-      }
-    } catch (error) {
-      setMessage('登录失败，请检查后端是否启动');
+  // 保存简历（带校验）
+  const handleSave = () => {
+    let hasError = false;
+    if (name.trim().length < 2 || name.trim().length > 20) {
+      setNameError('姓名长度应为2-20个字符');
+      hasError = true;
     }
-  };
-
-  // ========== 注册处理 ==========
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const formData = new FormData(e.target as HTMLFormElement);
-    const inputUsername = formData.get('username') as string;
-    const inputPassword = formData.get('password') as string;
-    const inputEmail = formData.get('email') as string;
-
-    try {
-      const res = await fetch('http://localhost:5000/api/user/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: inputUsername, password: inputPassword, email: inputEmail })
-      });
-      const data = await res.json();
-
-      if (data.code === 200 || data.code === 201) {
-        setMessage('注册成功，请登录');
-        setShowRegisterModal(false);
-        setShowLoginModal(true);
-      } else {
-        setMessage('注册失败：' + data.message);
-      }
-    } catch (error) {
-      setMessage('注册失败，请检查后端是否启动');
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setEmailError('请输入正确的邮箱格式');
+      hasError = true;
     }
+    const phoneRegex = /^1[3-9]\d{9}$/;
+    if (!phoneRegex.test(phone)) {
+      setPhoneError('请输入11位手机号');
+      hasError = true;
+    }
+    if (hasError) {
+      alert('请修正表单中的错误');
+      return;
+    }
+    alert('简历已保存（演示模式）');
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('username');
-    setIsLoggedIn(false);
-    setUsername('');
-    setResumes([]);
-    setMessage('已退出登录');
-    setTimeout(() => setMessage(''), 2000);
-  };
-
-  // ========== 首页：简历卡片列表 ==========
-  const HomeView = () => (
-    <div style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 'normal' }}>
-          {activeMenu === 'resumes' ? '📋 我的简历' : '👤 个人资料'}
-        </h2>
+  // 首页组件
+  const HomePage = () => (
+    <div className="max-w-5xl mx-auto text-center py-16 px-4">
+      <div className="mb-8">
+        <div className="text-6xl mb-4">📄</div>
+        <h1 className="text-4xl font-bold text-gray-800 mb-4">AI 简历构建器</h1>
+        <p className="text-xl text-gray-600 mb-8">智能生成专业简历，助你拿下心仪 Offer</p>
+        <button
+          onClick={() => setShowLoginModal(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg text-lg font-medium transition"
+        >
+          立即开始
+        </button>
       </div>
-
-      {activeMenu === 'resumes' && (
-        <>
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: '60px' }}>加载中...</div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' }}>
-              {/* 新建简历卡片 */}
-              <div onClick={createNewResume} style={newCardStyle}>
-                <div style={{ fontSize: '48px', marginBottom: '16px' }}>✨</div>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px' }}>新建简历</div>
-                <div style={{ fontSize: '14px', color: '#888' }}>点击创建一份新的简历</div>
-              </div>
-
-              {/* 已有简历卡片 */}
-              {resumes.map((resume) => (
-                <div key={resume.id} onClick={() => editResume(resume)} style={cardItemStyle}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ fontSize: '32px' }}>📄</div>
-                    <button onClick={(e) => deleteResume(resume.id, e)} style={deleteIconStyle}>🗑️</button>
-                  </div>
-                  <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {resume.name || '未命名'}
-                  </div>
-                  <div style={{ fontSize: '13px', color: '#666', marginTop: '4px' }}>
-                    {resume.jobTitle || '暂无职位'}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#999', marginTop: '12px' }}>
-                    更新于 {new Date(resume.updatedAt).toLocaleString()}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      )}
-
-      {activeMenu === 'profile' && (
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '32px', maxWidth: '500px', margin: '0 auto' }}>
-          <h3 style={{ marginBottom: '24px' }}>个人资料</h3>
-          {isLoggedIn ? (
-            <div>
-              <p><strong>用户名：</strong> {username}</p>
-              <p><strong>邮箱：</strong> {email || '未设置'}</p>
-              <button onClick={handleLogout} style={{ ...buttonStyle, backgroundColor: '#dc3545', marginTop: '20px' }}>退出登录</button>
-            </div>
-          ) : (
-            <div>
-              <p style={{ color: '#666', marginBottom: '20px' }}>请先登录</p>
-              <button onClick={() => setShowLoginModal(true)} style={buttonStyle}>去登录</button>
-            </div>
-          )}
+      <div className="grid md:grid-cols-3 gap-8 mt-16">
+        <div className="p-6 bg-white rounded-xl shadow-sm">
+          <div className="text-3xl mb-3">✨</div>
+          <h3 className="text-xl font-semibold mb-2">AI 智能生成</h3>
+          <p className="text-gray-600">输入工作经历，AI 自动撰写专业描述</p>
         </div>
-      )}
-
-      {resumes.length === 0 && activeMenu === 'resumes' && !loading && (
-        <div style={{ textAlign: 'center', padding: '60px', color: '#999' }}>
-          <p>暂无简历，点击"新建简历"开始创建</p>
+        <div className="p-6 bg-white rounded-xl shadow-sm">
+          <div className="text-3xl mb-3">📊</div>
+          <h3 className="text-xl font-semibold mb-2">多份简历管理</h3>
+          <p className="text-gray-600">轻松创建和管理多份不同岗位的简历</p>
         </div>
-      )}
+        <div className="p-6 bg-white rounded-xl shadow-sm">
+          <div className="text-3xl mb-3">📄</div>
+          <h3 className="text-xl font-semibold mb-2">PDF 导出</h3>
+          <p className="text-gray-600">一键导出专业排版简历</p>
+        </div>
+      </div>
     </div>
   );
 
-  // ========== 编辑页面 ==========
-  const EditorView = () => (
-    <div style={{ padding: '24px', overflow: 'auto', height: 'calc(100vh - 70px)' }}>
-      <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
-          <button onClick={() => { setCurrentView('home'); setActiveMenu('resumes'); }} style={backButtonStyle}>
-            ← 返回首页
+  // 侧边栏
+  const Sidebar = () => (
+    <aside className="w-64 bg-white shadow-md flex flex-col">
+      <div className="p-5 border-b">
+        <h1 className="text-xl font-bold text-blue-600">📄 AI简历</h1>
+      </div>
+      <nav className="flex-1 p-4 space-y-2">
+        {isLoggedIn ? (
+          <>
+            <button
+              onClick={() => setActiveMenu('resume')}
+              className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition ${
+                activeMenu === 'resume' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <span>✏️</span> 简历编辑
+            </button>
+            <button
+              onClick={() => setActiveMenu('preview')}
+              className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg transition ${
+                activeMenu === 'preview' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <span>👁️</span> 预览简历
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => setShowLoginModal(true)}
+            className="w-full flex items-center gap-3 px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100"
+          >
+            <span>🔐</span> 登录 / 注册
           </button>
-          <h2 style={{ margin: 0 }}>{editingResumeId ? '编辑简历' : '新建简历'}</h2>
-        </div>
+        )}
+      </nav>
+    </aside>
+  );
 
-        {/* 基本信息 */}
-        <Section title="基本信息">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <input type="text" placeholder="姓名 *" value={name} onChange={e => setName(e.target.value)} style={inputStyle} />
-            <input type="text" placeholder="职位" value={jobTitle} onChange={e => setJobTitle(e.target.value)} style={inputStyle} />
-            <input type="email" placeholder="邮箱" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} />
-            <input type="tel" placeholder="电话" value={phone} onChange={e => setPhone(e.target.value)} style={inputStyle} />
+  // 用户区域
+  const UserArea = () => {
+    if (!isLoggedIn) {
+      return (
+        <button onClick={() => setShowLoginModal(true)} className="text-gray-700 hover:text-blue-600 font-medium">
+          登录 / 注册
+        </button>
+      );
+    }
+    return (
+      <div className="relative" ref={userMenuRef}>
+        <div
+          className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 rounded-lg transition p-1"
+          onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+        >
+          <img src={DEMO_USER.avatar} alt="avatar" className="w-8 h-8 rounded-full" />
+          <span className="text-sm font-medium text-gray-700 hidden sm:inline">{DEMO_USER.name}</span>
+        </div>
+        {isUserMenuOpen && (
+          <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
+            <button
+              onClick={openSettings}
+              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition flex items-center gap-2"
+            >
+              <span>⚙️</span> 账号设置
+            </button>
+            <button
+              onClick={handleLogout}
+              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 transition flex items-center gap-2"
+            >
+              <span>🚪</span> 退出登录
+            </button>
           </div>
-          <input type="text" placeholder="技能（用逗号分隔，如：React, TypeScript, Node.js）" value={skills} onChange={e => setSkills(e.target.value)} style={inputStyle} />
-        </Section>
-
-        {/* AI 生成区 */}
-        <Section title="🤖 AI 智能生成" highlight>
-          <textarea placeholder="描述你的工作经历，AI 将生成3条专业简历要点..." value={aiInput} onChange={e => setAiInput(e.target.value)} rows={4} style={{ ...inputStyle, width: '100%' }} />
-          <button onClick={handleAIGenerate} disabled={aiLoading} style={{ ...buttonStyle, marginTop: '12px' }}>
-            {aiLoading ? '生成中...' : '✨ 生成简历要点'}
-          </button>
-        </Section>
-
-        {/* 工作经历 */}
-        <Section title="💼 工作经历">
-          {workExperiences.map((exp, idx) => (
-            <div key={exp.id} style={cardStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                <strong>经历 {idx + 1}</strong>
-                {workExperiences.length > 1 && <button onClick={() => removeWorkExperience(exp.id)} style={smallButtonStyle}>删除</button>}
-              </div>
-              <input type="text" placeholder="公司名称" value={exp.company} onChange={e => updateWorkExperience(exp.id, 'company', e.target.value)} style={inputStyle} />
-              <input type="text" placeholder="职位" value={exp.position} onChange={e => updateWorkExperience(exp.id, 'position', e.target.value)} style={inputStyle} />
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <input type="text" placeholder="开始时间" value={exp.startDate} onChange={e => updateWorkExperience(exp.id, 'startDate', e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-                <input type="text" placeholder="结束时间" value={exp.endDate} onChange={e => updateWorkExperience(exp.id, 'endDate', e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-              </div>
-              <textarea placeholder="工作描述" value={exp.description} onChange={e => updateWorkExperience(exp.id, 'description', e.target.value)} rows={3} style={inputStyle} />
-            </div>
-          ))}
-          <button onClick={addWorkExperience} style={outlineButtonStyle}>+ 添加工作经历</button>
-        </Section>
-
-        {/* 教育经历 */}
-        <Section title="🎓 教育经历">
-          {educations.map((edu, idx) => (
-            <div key={edu.id} style={cardStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                <strong>教育 {idx + 1}</strong>
-                {educations.length > 1 && <button onClick={() => removeEducation(edu.id)} style={smallButtonStyle}>删除</button>}
-              </div>
-              <input type="text" placeholder="学校名称" value={edu.school} onChange={e => updateEducation(edu.id, 'school', e.target.value)} style={inputStyle} />
-              <input type="text" placeholder="学位" value={edu.degree} onChange={e => updateEducation(edu.id, 'degree', e.target.value)} style={inputStyle} />
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <input type="text" placeholder="开始时间" value={edu.startDate} onChange={e => updateEducation(edu.id, 'startDate', e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-                <input type="text" placeholder="结束时间" value={edu.endDate} onChange={e => updateEducation(edu.id, 'endDate', e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-              </div>
-            </div>
-          ))}
-          <button onClick={addEducation} style={outlineButtonStyle}>+ 添加教育经历</button>
-        </Section>
-
-        {/* 个人简介 */}
-        <Section title="📝 个人简介">
-          <textarea placeholder="简要介绍自己..." value={summary} onChange={e => setSummary(e.target.value)} rows={4} style={{ ...inputStyle, width: '100%' }} />
-        </Section>
-
-        <div style={{ textAlign: 'center', marginTop: '24px', marginBottom: '40px' }}>
-          <button onClick={handleSaveResume} disabled={loading} style={{ ...buttonStyle, backgroundColor: '#28a745', padding: '12px 32px', fontSize: '16px' }}>
-            {loading ? '保存中...' : '💾 保存简历'}
-          </button>
-        </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
-  // ========== 主渲染 ==========
+  // 主渲染
   return (
-    <div style={{ minHeight: '100vh', width: '100%', position: 'relative' }}>
-      {/* 水晶背景 */}
-      <style>{`
-        @keyframes crystal-shimmer {
-          0%, 100% { 
-            background-position: 0% 0%, 0% 0%, 0% 0%, 50% 50%;
-            background-size: 10px 10px, 10px 10px, 200% 200%, 200% 200%;
-          }
-          50% { 
-            background-position: 1px 1px, -1px -1px, 100% 100%, 50% 50%;
-            background-size: 12px 12px, 12px 12px, 200% 200%, 180% 180%;
-          }
-        }
-      `}</style>
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 0,
-        background: `
-          repeating-linear-gradient(60deg, transparent 0px, transparent 1px, rgba(255,255,255,0.05) 1px, rgba(255,255,255,0.05) 2px),
-          repeating-linear-gradient(-60deg, transparent 0px, transparent 1px, rgba(255,255,255,0.05) 1px, rgba(255,255,255,0.05) 2px),
-          linear-gradient(60deg, rgba(43,108,176,0.4) 0%, rgba(72,126,176,0.4) 33%, rgba(95,142,176,0.4) 66%, rgba(116,157,176,0.4) 100%),
-          radial-gradient(circle at 50% 50%, rgba(255,255,255,0.2) 0%, transparent 50%)
-        `,
-        backgroundBlendMode: "overlay, overlay, normal, screen",
-        animation: "crystal-shimmer 15s ease-in-out infinite",
-      }} />
-
-      {/* 主内容区 */}
-      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', height: '100vh' }}>
-        
-        {/* 顶部栏 */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '12px 24px',
-          background: 'rgba(255,255,255,0.95)',
-          borderBottom: '1px solid #e0e0e0'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '24px' }}>📄</span>
-            <span style={{ fontSize: '18px', fontWeight: 'bold' }}>AI简历通</span>
-          </div>
-          
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            {isLoggedIn ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '14px', color: '#333' }}>{username}</span>
-                <div
-                  onClick={() => setShowLoginModal(true)}
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '50%',
-                    background: '#007bff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#fff',
-                    cursor: 'pointer',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  {username.charAt(0).toUpperCase()}
-                </div>
-              </div>
-            ) : (
-              <button
-                onClick={() => setShowLoginModal(true)}
-                style={{
-                  padding: '8px 16px',
-                  background: '#007bff',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '20px',
-                  cursor: 'pointer'
-                }}
-              >
-                登录 / 注册
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* 主体：侧边栏 + 内容区 */}
-        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-          {/* 左侧边栏 */}
-          <aside style={{
-            width: '200px',
-            background: 'rgba(26, 26, 46, 0.9)',
-            backdropFilter: 'blur(10px)',
-            color: '#fff',
-            display: 'flex',
-            flexDirection: 'column',
-            padding: '20px 0'
-          }}>
-            <nav>
-              <div
-                onClick={() => { setActiveMenu('resumes'); setCurrentView('home'); }}
-                style={{ ...menuItemStyle, background: activeMenu === 'resumes' && currentView === 'home' ? 'rgba(255,255,255,0.15)' : 'transparent' }}
-              >
-                <span style={{ marginRight: '12px' }}>📋</span> 我的简历
-              </div>
-              <div
-                onClick={() => { setActiveMenu('profile'); setCurrentView('home'); }}
-                style={{ ...menuItemStyle, background: activeMenu === 'profile' && currentView === 'home' ? 'rgba(255,255,255,0.15)' : 'transparent' }}
-              >
-                <span style={{ marginRight: '12px' }}>👤</span> 个人资料
-              </div>
-            </nav>
-          </aside>
-
-          {/* 右侧内容区 */}
-          <main style={{ flex: 1, overflow: 'auto', background: 'rgba(245, 247, 250, 0.6)' }}>
-            {currentView === 'home' ? <HomeView /> : <EditorView />}
-          </main>
-        </div>
+    <div className="flex h-screen bg-gray-100">
+      <Sidebar />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <header className="bg-white shadow-sm px-6 py-3 flex justify-end items-center gap-4">
+          <UserArea />
+        </header>
+        <main className="flex-1 overflow-auto p-6">
+          {!isLoggedIn ? (
+            <HomePage />
+          ) : (
+            <>
+              {activeMenu === 'resume' && (
+                <EditorView
+                  name={name}
+                  setName={setName}
+                  jobTitle={jobTitle}
+                  setJobTitle={setJobTitle}
+                  email={email}
+                  setEmail={setEmail}
+                  phone={phone}
+                  setPhone={setPhone}
+                  skills={skills}
+                  setSkills={setSkills}
+                  summary={summary}
+                  setSummary={setSummary}
+                  generatedSummary={generatedSummary}
+                  setGeneratedSummary={setGeneratedSummary}
+                  isGenerating={isGenerating}
+                  setIsGenerating={setIsGenerating}
+                  workExperiences={workExperiences}
+                  setWorkExperiences={setWorkExperiences}
+                  educations={educations}
+                  setEducations={setEducations}
+                  nameError={nameError}
+                  setNameError={setNameError}
+                  emailError={emailError}
+                  setEmailError={setEmailError}
+                  phoneError={phoneError}
+                  setPhoneError={setPhoneError}
+                  onAIGenerate={handleAIGenerate}
+                  onSave={handleSave}
+                />
+              )}
+              {activeMenu === 'preview' && (
+                <PreviewView
+                  name={name}
+                  jobTitle={jobTitle}
+                  email={email}
+                  phone={phone}
+                  summary={summary}
+                  generatedSummary={generatedSummary}
+                  skills={skills}
+                  onBack={() => setActiveMenu('resume')}
+                />
+              )}
+              {activeMenu === 'settings' && <SettingsView onBack={() => setActiveMenu('resume')} />}
+            </>
+          )}
+        </main>
       </div>
-
-      {/* 登录弹窗 */}
-      {showLoginModal && (
-        <div style={modalOverlayStyle} onClick={() => setShowLoginModal(false)}>
-          <div style={modalStyle} onClick={e => e.stopPropagation()}>
-            <h2 style={{ marginBottom: '20px' }}>登录</h2>
-            <form onSubmit={handleLogin}>
-              <input type="text" name="username" placeholder="用户名" style={{ ...inputStyle, marginBottom: '12px' }} required />
-              <input type="password" name="password" placeholder="密码" style={{ ...inputStyle, marginBottom: '20px' }} required />
-              <button type="submit" style={{ ...buttonStyle, width: '100%' }}>登录</button>
-            </form>
-            <p style={{ fontSize: '12px', color: '#999', marginTop: '16px', textAlign: 'center' }}>
-              还没有账号？{' '}
-              <span onClick={() => { setShowLoginModal(false); setShowRegisterModal(true); }} style={{ color: '#007bff', cursor: 'pointer' }}>
-                立即注册
-              </span>
-            </p>
-            <button onClick={() => setShowLoginModal(false)} style={{ ...outlineButtonStyle, width: '100%', marginTop: '12px' }}>取消</button>
-          </div>
-        </div>
-      )}
-
-      {/* 注册弹窗 */}
-      {showRegisterModal && (
-        <div style={modalOverlayStyle} onClick={() => setShowRegisterModal(false)}>
-          <div style={modalStyle} onClick={e => e.stopPropagation()}>
-            <h2 style={{ marginBottom: '20px' }}>注册</h2>
-            <form onSubmit={handleRegister}>
-              <input type="text" name="username" placeholder="用户名" style={{ ...inputStyle, marginBottom: '12px' }} required />
-              <input type="email" name="email" placeholder="邮箱" style={{ ...inputStyle, marginBottom: '12px' }} required />
-              <input type="password" name="password" placeholder="密码" style={{ ...inputStyle, marginBottom: '20px' }} required />
-              <button type="submit" style={{ ...buttonStyle, width: '100%' }}>注册</button>
-            </form>
-            <p style={{ fontSize: '12px', color: '#999', marginTop: '16px', textAlign: 'center' }}>
-              已有账号？{' '}
-              <span onClick={() => { setShowRegisterModal(false); setShowLoginModal(true); }} style={{ color: '#007bff', cursor: 'pointer' }}>
-                去登录
-              </span>
-            </p>
-            <button onClick={() => setShowRegisterModal(false)} style={{ ...outlineButtonStyle, width: '100%', marginTop: '12px' }}>取消</button>
-          </div>
-        </div>
-      )}
-
-      {/* 消息提示 */}
-      {message && (
-        <div style={{
-          position: 'fixed',
-          bottom: '24px',
-          right: '24px',
-          padding: '12px 20px',
-          background: message.includes('成功') || message.includes('欢迎') || message.includes('✅') ? '#28a745' : '#dc3545',
-          color: '#fff',
-          borderRadius: '8px',
-          zIndex: 1000
-        }}>
-          {message}
-        </div>
-      )}
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onLogin={handleLogin}
+        email={loginEmail}
+        setEmail={setLoginEmail}
+        password={loginPassword}
+        setPassword={setLoginPassword}
+        error={loginError}
+      />
     </div>
   );
 }
-
-// ========== 样式组件 ==========
-const Section: React.FC<{ title: string; children: React.ReactNode; highlight?: boolean }> = ({ title, children, highlight }) => (
-  <div style={{ marginBottom: '32px', background: highlight ? '#fff8e7' : '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-    <h3 style={{ marginBottom: '16px', fontSize: '18px', color: '#333' }}>{title}</h3>
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>{children}</div>
-  </div>
-);
-
-const inputStyle: React.CSSProperties = {
-  padding: '10px 14px',
-  border: '1px solid #e0e0e0',
-  borderRadius: '8px',
-  fontSize: '14px',
-  width: '100%',
-  boxSizing: 'border-box'
-};
-
-const buttonStyle: React.CSSProperties = {
-  padding: '10px 20px',
-  backgroundColor: '#007bff',
-  color: 'white',
-  border: 'none',
-  borderRadius: '8px',
-  cursor: 'pointer',
-  fontSize: '14px',
-  fontWeight: '500'
-};
-
-const outlineButtonStyle: React.CSSProperties = {
-  padding: '8px 16px',
-  backgroundColor: 'transparent',
-  color: '#007bff',
-  border: '1px solid #007bff',
-  borderRadius: '8px',
-  cursor: 'pointer',
-  fontSize: '14px'
-};
-
-const smallButtonStyle: React.CSSProperties = {
-  padding: '4px 12px',
-  backgroundColor: '#dc3545',
-  color: 'white',
-  border: 'none',
-  borderRadius: '6px',
-  cursor: 'pointer',
-  fontSize: '12px'
-};
-
-const backButtonStyle: React.CSSProperties = {
-  padding: '8px 16px',
-  backgroundColor: '#f0f0f0',
-  border: 'none',
-  borderRadius: '8px',
-  cursor: 'pointer',
-  fontSize: '14px'
-};
-
-const cardStyle: React.CSSProperties = {
-  background: '#f9f9f9',
-  borderRadius: '12px',
-  padding: '16px',
-  marginBottom: '16px'
-};
-
-const newCardStyle: React.CSSProperties = {
-  background: '#fff',
-  borderRadius: '16px',
-  padding: '24px',
-  textAlign: 'center',
-  cursor: 'pointer',
-  transition: 'transform 0.2s, box-shadow 0.2s',
-  boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-  border: '2px dashed #ccc'
-};
-
-const cardItemStyle: React.CSSProperties = {
-  background: '#fff',
-  borderRadius: '16px',
-  padding: '20px',
-  cursor: 'pointer',
-  transition: 'transform 0.2s, box-shadow 0.2s',
-  boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-};
-
-const deleteIconStyle: React.CSSProperties = {
-  background: 'none',
-  border: 'none',
-  cursor: 'pointer',
-  fontSize: '18px',
-  padding: '4px',
-  opacity: 0.6
-};
-
-const menuItemStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  padding: '12px 20px',
-  cursor: 'pointer',
-  marginBottom: '8px',
-  transition: 'background 0.2s'
-};
-
-const modalOverlayStyle: React.CSSProperties = {
-  position: 'fixed',
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  background: 'rgba(0,0,0,0.5)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 2000
-};
-
-const modalStyle: React.CSSProperties = {
-  background: '#fff',
-  borderRadius: '16px',
-  padding: '32px',
-  width: '400px',
-  maxWidth: '90%'
-};
 
 export default App;

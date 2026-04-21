@@ -9,8 +9,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 const userRoutes = require('./routes/user');
+const resumeRoutes = require('./routes/resume');
 const authenticateToken = require('./middleware/auth');
 app.use('/api/user', userRoutes);
+app.use('/api/resume', resumeRoutes);
 
 // 测试路由
 app.get('/', (req, res) => {

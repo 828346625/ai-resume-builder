@@ -535,29 +535,47 @@ function App() {
   const [phoneError, setPhoneError] = useState('');
 
   // 模拟登录
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loginEmail && loginPassword) {
-      setIsLoggedIn(true);
-      setShowLoginModal(false);
-      setLoginError('');
-      setActiveMenu('resume');
-      // 清空之前的数据（可选）
-      setSkills('');
-      setEmail(loginEmail);
-      setGeneratedSummary('');
-      setName('');
-      setJobTitle('');
-      setPhone('');
-      setSummary('');
-      setWorkExperiences([{ id: Date.now(), company: '', position: '', startDate: '', endDate: '', description: '' }]);
-      setEducations([]);
-      setNameError('');
-      setEmailError('');
-      setPhoneError('');
-    } else {
+    if (!loginEmail || !loginPassword) {
       setLoginError('请输入邮箱和密码');
+      return;
     }
+    
+    try {
+      const res = await fetch('http://localhost:5000/api/user/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail, password: loginPassword })
+      });
+      const data = await res.json();
+      
+      if (data.code === 200) {
+        localStorage.setItem('token', data.data.token);
+        setIsLoggedIn(true);
+        setShowLoginModal(false);
+        setLoginError('');
+        setActiveMenu('resume');
+        // 清空之前的数据
+        setSkills('');
+        setEmail(loginEmail);
+        setGeneratedSummary('');
+        setName('');
+        setJobTitle('');
+        setPhone('');
+        setSummary('');
+        setWorkExperiences([{ id: Date.now(), company: '', position: '', startDate: '', endDate: '', description: '' }]);
+        setEducations([]);
+        setNameError('');
+        setEmailError('');
+        setPhoneError('');
+      } else {
+        setLoginError(data.message || '登录失败');
+      }
+    } catch (error) {
+      setLoginError('网络错误，请重试');
+    }
+  };
   };
 
   const handleLogout = () => {
@@ -604,9 +622,13 @@ function App() {
     }
     setIsGenerating(true);
     try {
-      const res = await fetch('http://localhost:3001/api/resume/generate', {
+      const token = localStorage.getItem('token');
+      const res = await fetch('http://localhost:5000/api/resume/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ experience: workDesc, skills: skills.split(',').map(s => s.trim()) }),
       });
       const data = await res.json();
@@ -630,7 +652,7 @@ function App() {
   };
 
   // 保存简历（带校验）
-  const handleSave = () => {
+  const handleSave = async () => {
     let hasError = false;
     if (name.trim().length < 2 || name.trim().length > 20) {
       setNameError('姓名长度应为2-20个字符');
@@ -650,6 +672,37 @@ function App() {
       alert('请修正表单中的错误');
       return;
     }
+
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('http://localhost:5000/api/resume', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name,
+          jobTitle,
+          email,
+          phone,
+          skills: skills.split(',').map(s => s.trim()).filter(s => s),
+          workExperiences,
+          educations,
+          summary
+        })
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        alert('简历保存成功！');
+      } else {
+        alert('保存失败：' + data.message);
+      }
+    } catch (error) {
+      alert('网络错误，请重试');
+    }
+  };
     alert('简历已保存（演示模式）');
   };
 

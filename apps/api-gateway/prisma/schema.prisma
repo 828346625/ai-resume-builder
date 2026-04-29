@@ -1,0 +1,229 @@
+// Prisma Schema for AI Resume Builder
+// Documentation: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// 用户相关模型
+// ============================================
+
+model User {
+  id            Int       @id @default(autoincrement())
+  username      String    @unique @db.VarChar(50)
+  email         String    @unique @db.VarChar(100)
+  passwordHash  String    @map("password_hash") @db.VarChar(255)
+  role          UserRole  @default(USER)
+  status        UserStatus @default(ACTIVE)
+  emailVerified Boolean   @default(false) @map("email_verified")
+  lastLoginAt   DateTime? @map("last_login_at") @db.DateTime(0)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.DateTime(0)
+  deletedAt     DateTime? @map("deleted_at") @db.DateTime(0)
+
+  // 关系
+  resumes           Resume[]
+  resumeTemplates   ResumeTemplate[]   @relation("TemplateCreator")
+  auditLogs         AuditLog[]
+  refreshTokens     RefreshToken[]
+
+  @@index([email])
+  @@index([status])
+  @@index([createdAt])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique @db.VarChar(500)
+  userId    Int      @map("user_id")
+  expiresAt DateTime @map("expires_at") @db.DateTime(0)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  revokedAt DateTime? @map("revoked_at") @db.DateTime(0)
+  ipAddress String?  @map("ip_address") @db.VarChar(45)
+  userAgent String?  @map("user_agent") @db.VarChar(500)
+
+  // 关系
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+// ============================================
+// 简历相关模型
+// ============================================
+
+model Resume {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @map("user_id")
+  name        String    @db.VarChar(100)
+  jobTitle    String?   @map("job_title") @db.VarChar(100)
+  email       String?   @db.VarChar(100)
+  phone       String?   @db.VarChar(20)
+  summary     String?   @db.Text
+  templateId  Int?      @map("template_id")
+  isDefault   Boolean   @default(false) @map("is_default")
+  version     Int       @default(1)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.DateTime(0)
+  deletedAt   DateTime? @map("deleted_at") @db.DateTime(0)
+
+  // 关系
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template         ResumeTemplate?    @relation(fields: [templateId], references: [id])
+  workExperiences  WorkExperience[]
+  educations       Education[]
+  skills           Skill[]
+  versions         ResumeVersion[]
+
+  @@index([userId])
+  @@index([isDefault])
+  @@index([updatedAt])
+  @@map("resumes")
+}
+
+model ResumeVersion {
+  id            Int      @id @default(autoincrement())
+  resumeId      Int      @map("resume_id")
+  version       Int
+  data          Json
+  changeSummary String?  @map("change_summary") @db.VarChar(500)
+  createdById   Int?     @map("created_by_id")
+  createdAt     DateTime @default(now()) @map("created_at") @db.DateTime(0)
+
+  // 关系
+  resume    Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  createdBy User?  @relation(fields: [createdById], references: [id])
+
+  @@unique([resumeId, version])
+  @@index([resumeId])
+  @@map("resume_versions")
+}
+
+model WorkExperience {
+  id          Int       @id @default(autoincrement())
+  resumeId    Int       @map("resume_id")
+  company     String    @db.VarChar(100)
+  position    String    @db.VarChar(100)
+  startDate   DateTime? @map("start_date") @db.Date
+  endDate     DateTime? @map("end_date") @db.Date
+  description String?   @db.Text
+  sortOrder   Int       @default(0) @map("sort_order")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.DateTime(0)
+
+  // 关系
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  @@index([resumeId])
+  @@index([sortOrder])
+  @@map("work_experiences")
+}
+
+model Education {
+  id          Int       @id @default(autoincrement())
+  resumeId    Int       @map("resume_id")
+  school      String    @db.VarChar(100)
+  degree      String?   @db.VarChar(50)
+  major       String?   @db.VarChar(100)
+  startDate   DateTime? @map("start_date") @db.Date
+  endDate     DateTime? @map("end_date") @db.Date
+  gpa         Decimal?  @db.Decimal(3, 2)
+  sortOrder   Int       @default(0) @map("sort_order")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.DateTime(0)
+
+  // 关系
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  @@index([resumeId])
+  @@map("educations")
+}
+
+model Skill {
+  id        Int       @id @default(autoincrement())
+  resumeId  Int       @map("resume_id")
+  name      String    @db.VarChar(50)
+  level     SkillLevel @default(INTERMEDIATE)
+  sortOrder Int       @default(0) @map("sort_order")
+  createdAt DateTime  @default(now()) @map("created_at") @db.DateTime(0)
+
+  // 关系
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  @@index([resumeId])
+  @@map("skills")
+}
+
+model ResumeTemplate {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(100)
+  thumbnailUrl String? @map("thumbnail_url") @db.VarChar(500)
+  config      Json
+  isPublic    Boolean  @default(false) @map("is_public")
+  createdById Int?     @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.DateTime(0)
+
+  // 关系
+  createdBy  User     @relation("TemplateCreator", fields: [createdById], references: [id])
+  resumes    Resume[]
+
+  @@index([createdById])
+  @@map("resume_templates")
+}
+
+// ============================================
+// 审计日志
+// ============================================
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int?     @map("user_id")
+  action      String   @db.VarChar(50)
+  entityType  String   @map("entity_type") @db.VarChar(50)
+  entityId    Int?     @map("entity_id")
+  oldData     Json?    @map("old_data")
+  newData     Json?    @map("new_data")
+  ipAddress   String?  @map("ip_address") @db.VarChar(45)
+  userAgent   String?  @map("user_agent") @db.VarChar(500)
+  createdAt   DateTime @default(now()) @map("created_at") @db.DateTime(0)
+
+  // 关系
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ============================================
+// 枚举定义
+// ============================================
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  BANNED
+}
+
+enum SkillLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
